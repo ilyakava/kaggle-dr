@@ -1,0 +1,6 @@
+.DS_Store
+*.pkl.gz
+*.pyc
+*.pdf
+data/*
+
