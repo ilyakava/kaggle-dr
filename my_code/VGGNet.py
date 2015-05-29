@@ -85,7 +85,7 @@ class VGGNet(Ciresan2012Column):
         print '... building the column'
 
         # EDIT ME
-        model_spec = [(224, 3)] + vggneta # input with 3 channels and size 224
+        model_spec = [(224, 1)] + vggneta # input with 3 channels and size 224
         # EDIT ME
 
         # list to hold layers, each element must have an `output` property,
@@ -103,7 +103,7 @@ class VGGNet(Ciresan2012Column):
         for i in xrange(1,len(model_spec)):
             if len(model_spec[i]) == 3:
                 layer_sizes[i] = (layer_sizes[i-1] - model_spec[i][0]) / model_spec[i][2]
-
+        print layer_sizes
         # create layers
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
@@ -112,18 +112,21 @@ class VGGNet(Ciresan2012Column):
             pz = layer_sizes[i - 1] # previous size
 
             fltargs = dict(n_in=ps[1] * pz**2, n_out=cs[1])
-
+            print i
             if len(cs) == 3: # conv layer
                 image_shape = (ps[1], cz, cz, batch_size) if cuda_convnet else (batch_size, ps[1], cz, cz)
-                filter_shape = (ps[1], cs[0], cs[0], cs[1]) if cuda_convnet else (ps[1], cs[0], cs[0], cs[1])
+                filter_shape = (ps[1], cs[0], cs[0], cs[1]) if cuda_convnet else (cs[1], ps[1], cs[0], cs[0])
+                print image_shape
+                print filter_shape
                 layers[i] = LeNetConvPoolLayer(
                     rng,
                     input=layers[i-1].output,
-                    image_shape=image_shape, # (prev_thickness, cur_size, cur_size, bs)
                     filter_shape=filter_shape, # (prev_thickness, convx, convy, cur_thickness)
+                    image_shape=image_shape, # (prev_thickness, cur_size, cur_size, bs)
                     poolsize=(cs[2], cs[2]),
                     cuda_convnet=cuda_convnet,
-                    activation=lr
+                    activation=lr,
+                    border_mode='full'
                 )
             elif i == (len(model_spec) - 1): # last softmax layer
                 assert(len(ps) == 2) # must follow an FC layer
@@ -134,7 +137,7 @@ class VGGNet(Ciresan2012Column):
                     flt_input = raw_in.dimshuffle(3, 0, 1, 2).flatten(2) if cuda_convnet else raw_in.flatten(2)
                 else:
                     flt_input = raw_in
-                layers[i] = HiddenLayer(rng, input=flt_input, **fltargs, activation=T.tanh)
+                layers[i] = HiddenLayer(rng, input=flt_input, activation=T.tanh, **fltargs)
 
         # TODO change this to the kappa loss
         cost = layers[-1].negative_log_likelihood(y)
@@ -168,8 +171,9 @@ class VGGNet(Ciresan2012Column):
         )
 
         # create a list of all model parameters to be fit by gradient descent
-        self.params = [layer.params for layer in layers[1:]]
-        self.column_params = [nkerns, batch_size, normalized_width, distortion, cuda_convnet]
+        nonflat_params = [layer.params for layer in layers[1:]]
+        self.params = [item for sublist in nonflat_params for item in sublist]
+        self.column_params = [model_spec, batch_size, cuda_convnet]
 
         # create a list of gradients for all model parameters
         grads = T.grad(cost, self.params)
