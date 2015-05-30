@@ -97,19 +97,24 @@ class VGGNet(Ciresan2012Column):
         network_input = raw_image_data.dimshuffle(1, 2, 3, 0) if cuda_convnet else raw_image_data
         layers[0] = NetworkInput(raw_image_data)
 
-        # precompute layer sizes: (prev_size - cur_conv / maxpool degree)
+        # precompute layer sizes: not (prev_size - cur_conv / maxpool degree) since we are padding images
+        layer_sizes_ignore_pool = numpy.ones(len(model_spec), dtype=int)
         layer_sizes = numpy.ones(len(model_spec), dtype=int)
-        layer_sizes[0] = model_spec[0][0] # input image size
+        layer_sizes_ignore_pool[0] = model_spec[0][0] # input image size
+        layer_sizes[0] = model_spec[0][0]
         for i in xrange(1,len(model_spec)):
             if len(model_spec[i]) == 3:
-                layer_sizes[i] = (layer_sizes[i-1] - model_spec[i][0]) / model_spec[i][2]
+                layer_sizes_ignore_pool[i] = layer_sizes_ignore_pool[i-1] # size stays the same with padding
+                # will automatically round down to match ignore_border=T in theano.tensor.signal.downsample.max_pool_2d
+                layer_sizes[i] = layer_sizes_ignore_pool[i-1] / model_spec[i][2]
+
         print layer_sizes
         # create layers
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
-            cz = layer_sizes[i] # current size
+            cz = layer_sizes_ignore_pool[i] # current size (given to conv op, so pool needs to be ignored)
             ps = model_spec[i - 1] # previous spec
-            pz = layer_sizes[i - 1] # previous size
+            pz = layer_sizes[i - 1] # previous size (as will be input into current layer, i.e. take into account pool)
 
             fltargs = dict(n_in=ps[1] * pz**2, n_out=cs[1])
             print i
@@ -231,7 +236,7 @@ if __name__ == '__main__':
     arg_names = ['command', 'batch_size', 'cuda_convnet', 'leakiness', 'init_learning_rate', 'n_epochs']
     arg = dict(zip(arg_names, sys.argv))
 
-    batch_size = int(arg.get('batch_size') or 100)
+    batch_size = int(arg.get('batch_size') or 2)
     cuda_convnet = int(arg.get('cuda_convnet') or 0)
     leakiness = int(arg.get('leakiness') or 0.01)
     init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
