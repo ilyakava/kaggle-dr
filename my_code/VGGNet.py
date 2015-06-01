@@ -111,12 +111,15 @@ class VGGNet(Ciresan2012Column):
         print layer_input_sizes
         # create layers
         print "cuda_convnet %i" % cuda_convnet
+        total_parameter_count = 0
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             iz = layer_input_sizes[i] # input size
             ps = model_spec[i - 1] # previous spec
 
-            fltargs = dict(n_in=ps[1] * iz**2, n_out=cs[1])
+            prev_layer_params = ps[1] * iz**2
+            fltargs = dict(n_in=prev_layer_params, n_out=cs[1]) # n_out only relevant for FC layers
+            total_parameter_count += prev_layer_params
             print i
             if len(cs) == 3: # conv layer
                 image_shape = (ps[1], iz, iz, batch_size) if cuda_convnet else (batch_size, ps[1], iz, iz)
@@ -147,6 +150,8 @@ class VGGNet(Ciresan2012Column):
                     flt_input = raw_in
                 layers[i] = HiddenLayer(rng, input=flt_input, activation=T.tanh, **fltargs)
 
+        # going off of: http://cs231n.github.io/convolutional-networks/
+        print "Estimated memory usage is %f MB per input image" % round(total_parameter_count * 4e-6 * 3, 2)
         # TODO change this to the kappa loss
         cost = layers[-1].negative_log_likelihood(y)
 
