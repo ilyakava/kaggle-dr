@@ -1,10 +1,10 @@
 ## Getting Started
 
-### Code from ciresan and theanet
+### Clone Code from ciresan and theanet
 
 `git submodule update --init --recursive`
 
-### Lasange
+### Install Lasange
 
 ```
 git clone https://github.com/Lasagne/Lasagne.git

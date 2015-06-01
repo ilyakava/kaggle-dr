@@ -85,7 +85,7 @@ class VGGNet(Ciresan2012Column):
         print '... building the column'
 
         # EDIT ME
-        model_spec = [(224, 1)] + vggneta # input with 3 channels and size 224
+        model_spec = [(224, 1)] + vggneta # input with 1 channels and size 224
         # EDIT ME
 
         # list to hold layers, each element must have an `output` property,
@@ -98,28 +98,28 @@ class VGGNet(Ciresan2012Column):
         layers[0] = NetworkInput(raw_image_data)
 
         # precompute layer sizes: not (prev_size - cur_conv / maxpool degree) since we are padding images
-        layer_sizes_ignore_pool = numpy.ones(len(model_spec), dtype=int)
-        layer_sizes = numpy.ones(len(model_spec), dtype=int)
-        layer_sizes_ignore_pool[0] = model_spec[0][0] # input image size
-        layer_sizes[0] = model_spec[0][0]
-        for i in xrange(1,len(model_spec)):
-            if len(model_spec[i]) == 3:
-                layer_sizes_ignore_pool[i] = layer_sizes_ignore_pool[i-1] # size stays the same with padding
-                # will automatically round down to match ignore_border=T in theano.tensor.signal.downsample.max_pool_2d
-                layer_sizes[i] = layer_sizes_ignore_pool[i-1] / model_spec[i][2]
+        layer_input_sizes = numpy.ones(len(model_spec), dtype=int)
+        layer_input_sizes[0] = model_spec[0][0]
+        layer_input_sizes[1] = layer_input_sizes[0]
+        for i in xrange(2,len(model_spec)):
+            downsample = model_spec[i-1][2] if (len(model_spec[i-1]) == 3) else 1
+            if (len(model_spec[i-1]) == 3) or (i == 1):
+                # int division will automatically round down to match ignore_border=T
+                # in theano.tensor.signal.downsample.max_pool_2d
+                layer_input_sizes[i] = (layer_input_sizes[i-1] + 2) / downsample
 
-        print layer_sizes
+        print layer_input_sizes
         # create layers
+        print "cuda_convnet %i" % cuda_convnet
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
-            cz = layer_sizes_ignore_pool[i] # current size (given to conv op, so pool needs to be ignored)
+            iz = layer_input_sizes[i] # input size
             ps = model_spec[i - 1] # previous spec
-            pz = layer_sizes[i - 1] # previous size (as will be input into current layer, i.e. take into account pool)
 
-            fltargs = dict(n_in=ps[1] * pz**2, n_out=cs[1])
+            fltargs = dict(n_in=ps[1] * iz**2, n_out=cs[1])
             print i
             if len(cs) == 3: # conv layer
-                image_shape = (ps[1], cz, cz, batch_size) if cuda_convnet else (batch_size, ps[1], cz, cz)
+                image_shape = (ps[1], iz, iz, batch_size) if cuda_convnet else (batch_size, ps[1], iz, iz)
                 filter_shape = (ps[1], cs[0], cs[0], cs[1]) if cuda_convnet else (cs[1], ps[1], cs[0], cs[0])
                 print image_shape
                 print filter_shape
@@ -134,9 +134,12 @@ class VGGNet(Ciresan2012Column):
                     border_mode='full'
                 )
             elif i == (len(model_spec) - 1): # last softmax layer
+                print fltargs
                 assert(len(ps) == 2) # must follow an FC layer
                 layers[i] = LogisticRegression(input=layers[i-1].output, **fltargs)
             elif len(cs) == 2: # FC layer
+                print fltargs
+                # pdb.set_trace()
                 raw_in = layers[i-1].output
                 if len(ps) == 3: # previous layer was a conv layer
                     flt_input = raw_in.dimshuffle(3, 0, 1, 2).flatten(2) if cuda_convnet else raw_in.flatten(2)
@@ -227,7 +230,7 @@ def train_vggnet(init_learning_rate=0.001, n_epochs=800,
     :type nkerns: list of ints
     :param nkerns: number of kernels on each layer
     """
-    datasets = load_data(dataset, 0, 224)
+    datasets = load_data(dataset, 0, 224, conserve_gpu_memory=True)
     column = VGGNet(datasets, batch_size, cuda_convnet, leakiness)
     column.train_column(init_learning_rate, n_epochs)
 
