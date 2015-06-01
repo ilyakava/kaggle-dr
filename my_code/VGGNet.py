@@ -30,7 +30,7 @@ class NetworkInput(object):
         self.output = input
 
 class VGGNet(Ciresan2012Column):
-    def __init__(self, datasets, batch_size=128, cuda_convnet=0, leakiness=0.01, params=None):
+    def __init__(self, datasets, batch_size=128, cuda_convnet=0, leakiness=0.01, params=None, model_spec=None, partial_sum=None):
         """
         :param datasets: Array of train, val, test x,y tuples
 
@@ -63,30 +63,10 @@ class VGGNet(Ciresan2012Column):
                             # [int] labels
         lr = LeakyRectify(leakiness)
 
-        # TODO make this an argument to the class
-        vggneta = [
-            (3,64,2), # 64 3x3 filters with 2x2 maxpooling after
-            (3,128,2),
-            (3,256,1), # no maxpool after
-            (3,256,2),
-            (3,512,1),
-            (3,512,2),
-            (3,512,1),
-            (3,512,2),
-            (1, 4096), # FC layer
-            (1, 4096),
-            (1, 5), # FC, probably thin this out a different way
-            (1, 5) # softmax
-        ]
-
         ######################
         # BUILD ACTUAL MODEL #
         ######################
         print '... building the column'
-
-        # EDIT ME
-        model_spec = [(224, 1)] + vggneta # input with 1 channels and size 224
-        # EDIT ME
 
         # list to hold layers, each element must have an `output` property,
         # each element after the first one must also have a `params` property
@@ -95,7 +75,7 @@ class VGGNet(Ciresan2012Column):
         # TODO get rid of dimshuffle
         raw_image_data = x.reshape((batch_size, model_spec[0][1], model_spec[0][0], model_spec[0][0]))
         network_input = raw_image_data.dimshuffle(1, 2, 3, 0) if cuda_convnet else raw_image_data
-        layers[0] = NetworkInput(raw_image_data)
+        layers[0] = NetworkInput(network_input)
 
         # precompute layer sizes: not (prev_size - cur_conv / maxpool degree) since we are padding images
         layer_input_sizes = numpy.ones(len(model_spec), dtype=int)
@@ -106,7 +86,8 @@ class VGGNet(Ciresan2012Column):
             if (len(model_spec[i-1]) == 3) or (i == 1):
                 # int division will automatically round down to match ignore_border=T
                 # in theano.tensor.signal.downsample.max_pool_2d
-                layer_input_sizes[i] = (layer_input_sizes[i-1] + 2) / downsample
+                additive = 0 if cuda_convnet else 2
+                layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
 
         print layer_input_sizes
         # create layers
@@ -134,7 +115,9 @@ class VGGNet(Ciresan2012Column):
                     poolsize=(cs[2], cs[2]),
                     cuda_convnet=cuda_convnet,
                     activation=lr,
-                    border_mode='full'
+                    border_mode='full',
+                    partial_sum=partial_sum,
+                    pad=1
                 )
             elif i == (len(model_spec) - 1): # last softmax layer
                 print fltargs
@@ -219,8 +202,54 @@ class VGGNet(Ciresan2012Column):
             }
         )
 
+vggneta = [
+    (3,64,2), # 64 3x3 filters with 2x2 maxpooling after
+    (3,128,2),
+    (3,256,1), # no maxpool after
+    (3,256,2),
+    (3,512,1),
+    (3,512,2),
+    (3,512,1),
+    (3,512,2),
+    (1, 4096), # FC layer
+    (1, 4096),
+    (1, 5), # FC, probably thin this out a different way
+    (1, 5) # softmax
+]
+
+# only difference is smaller pooling window
+planktonnet = [
+    (3,32,1),
+    (3,16,2),
+    (3,64,1),
+    (3,32,2),
+    (3,128,1),
+    (3,128,1),
+    (3,64,2),
+    (3,256,1),
+    (3,256,1),
+    (3,128,2),
+    (1, 512),
+    (1, 512),
+    (1, 5),
+    (1, 5)
+]
+
+planktonnetlite = [
+    (3,16,2),
+    (3,32,2),
+    (3,64,1),
+    (3,32,2),
+    (3,128,1),
+    (3,64,2),
+    (1, 256),
+    (1, 256),
+    (1, 5),
+    (1, 5)
+]
+
 def train_vggnet(init_learning_rate=0.001, n_epochs=800,
-                 dataset='mnist.pkl.gz', batch_size=1000, cuda_convnet=0, leakiness=0.01):
+                 dataset='mnist.pkl.gz', batch_size=1000, cuda_convnet=0, leakiness=0.01, partial_sum=None):
     """
     :type learning_rate: float
     :param learning_rate: learning rate used (factor for the stochastic
@@ -235,19 +264,25 @@ def train_vggnet(init_learning_rate=0.001, n_epochs=800,
     :type nkerns: list of ints
     :param nkerns: number of kernels on each layer
     """
-    datasets = load_data(dataset, 0, 224, conserve_gpu_memory=True)
-    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness)
+    input_image_size = 112
+    input_image_channels = 1
+    model_spec = [(input_image_size, input_image_channels)] + planktonnetlite
+
+    datasets = load_data(dataset, 0, input_image_size, conserve_gpu_memory=True)
+
+    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, model_spec=model_spec, partial_sum=partial_sum)
     column.train_column(init_learning_rate, n_epochs)
 
 
 if __name__ == '__main__':
-    arg_names = ['command', 'batch_size', 'cuda_convnet', 'leakiness', 'init_learning_rate', 'n_epochs']
+    arg_names = ['command', 'batch_size', 'cuda_convnet', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
     arg = dict(zip(arg_names, sys.argv))
 
     batch_size = int(arg.get('batch_size') or 2)
     cuda_convnet = int(arg.get('cuda_convnet') or 0)
+    partial_sum = int(arg.get('partial_sum') or 0) or None
     leakiness = int(arg.get('leakiness') or 0.01)
     init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
     n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
 
-    train_vggnet(init_learning_rate=init_learning_rate, n_epochs=n_epochs, batch_size=batch_size, cuda_convnet=cuda_convnet)
+    train_vggnet(init_learning_rate=init_learning_rate, n_epochs=n_epochs, batch_size=batch_size, cuda_convnet=cuda_convnet, partial_sum=partial_sum)
