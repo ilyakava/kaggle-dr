@@ -250,7 +250,7 @@ planktonnetlite = [
 ]
 
 def train_vggnet(init_learning_rate=0.001, n_epochs=800,
-                 dataset='mnist.pkl.gz', batch_size=1000, cuda_convnet=0, leakiness=0.01, partial_sum=None):
+                 dataset='data/train_simple_crop.npz', batch_size=1000, cuda_convnet=0, leakiness=0.01, partial_sum=None):
     """
     :type learning_rate: float
     :param learning_rate: learning rate used (factor for the stochastic
@@ -266,10 +266,11 @@ def train_vggnet(init_learning_rate=0.001, n_epochs=800,
     :param nkerns: number of kernels on each layer
     """
     input_image_size = 112
-    input_image_channels = 1
+    input_image_channels = 3
+    image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [(input_image_size, input_image_channels)] + planktonnetlite
 
-    datasets = load_data(dataset, 0, input_image_size, conserve_gpu_memory=True)
+    datasets = load_data(dataset, conserve_gpu_memory=True, center=1, image_shape=image_shape)
 
     column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, model_spec=model_spec, partial_sum=partial_sum)
     column.train_column(init_learning_rate, n_epochs)
