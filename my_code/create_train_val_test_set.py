@@ -6,7 +6,7 @@ from ciresan.code.package_data import package_data
 
 import pdb
 
-def create_train_val_set(image_directory, label_csv, test_set_size, outfile_path):
+def create_train_val_set(image_directory, label_csv, test_set_size, image_shape, outfile_path):
     assert(test_set_size % 2 == 0)
     # create set of int ids
     entire_dataset = {}
@@ -40,15 +40,19 @@ def create_train_val_set(image_directory, label_csv, test_set_size, outfile_path
         train_dataset["%s.jpeg" % left] = entire_dataset[left]
         train_dataset["%s.jpeg" % right] = entire_dataset[right]
     # pickle the selection
-    package_data(image_directory, (train_dataset, test_dataset, {}), outfile_path)
+    package_data(image_directory, (train_dataset, test_dataset, {}), image_shape, outfile_path)
 
 if __name__ == '__main__':
-    arg_names = ['command', 'image_directory', 'label_csv', 'test_set_size']
+    arg_names = ['command', 'image_directory', 'outfile_path', 'height', 'channels', 'test_set_size', 'label_csv']
     arg = dict(zip(arg_names, sys.argv))
 
-    image_directory = arg.get('image_directory') or 'data/train/simple_crop'
-    label_csv = arg.get('label_csv') or 'data/trainLabels.csv'
+    image_directory = arg.get('image_directory') or 'data/train/simple_crop/'
+    outfile_path = arg.get('outfile_path') or 'data/train_testA.npz'
+    height = int(arg.get('height') or 112)
+    channels = int(arg.get('channels') or 3)
     test_set_size = int(arg.get('test_set_size') or 1406)
-    outfile_path = arg.get('outfile_path') or 'data/train_testA.pkl.gz'
+    label_csv = arg.get('label_csv') or 'data/trainLabels.csv'
 
-    create_train_val_set(image_directory, label_csv, test_set_size, outfile_path)
+    image_shape = (height, height, channels)
+
+    create_train_val_set(image_directory, label_csv, test_set_size, image_shape, outfile_path)

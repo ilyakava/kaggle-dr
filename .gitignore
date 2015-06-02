@@ -4,3 +4,4 @@
 *.pdf
 data/*
 
+*.npz
