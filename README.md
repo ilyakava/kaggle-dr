@@ -15,6 +15,6 @@ sudo python setup.py install
 
 ### Data
 
-Download from kaggle, run to unpack:
+Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/data?trainLabels.csv.zip), run to unpack:
 
 `7z x train.zip.001`
