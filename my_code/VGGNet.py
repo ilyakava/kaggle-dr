@@ -202,7 +202,8 @@ class VGGNet(Ciresan2012Column):
             }
         )
 
-vggneta = [
+# also called vgg A
+vgg_11 = [
     (3,64,2), # 64 3x3 filters with 2x2 maxpooling after
     (3,128,2),
     (3,256,1), # no maxpool after
