@@ -29,7 +29,10 @@ if __name__ == '__main__':
     out_dir = arg.get('out_dir') or 'data/train/simple_crop/'
     mode = int(arg.get('mode') or 1)
     size = int(arg.get('size') or 112)
-    num_batch_files = int(arg.get('num_batch_files') or 6)
+    # graphicsmagick seems to only run on 1 core, there is a 30% increase in performance
+    # using 2 over 1 batch files (probably just b/c of less idleness)
+    # TODO: try forking from python and doing processing from this script
+    num_batch_files = int(arg.get('num_batch_files') or 2)
 
     files = numpy.array(listdir(in_dir))
     split_idx_multiple = len(files) / num_batch_files

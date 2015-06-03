@@ -282,8 +282,8 @@ if __name__ == '__main__':
 
     batch_size = int(arg.get('batch_size') or 2)
     cuda_convnet = int(arg.get('cuda_convnet') or 0)
-    partial_sum = int(arg.get('partial_sum') or 0) or None
-    leakiness = int(arg.get('leakiness') or 0.01)
+    partial_sum = int(arg.get('partial_sum') or 0) or None # 0 turns into None. None or 1 work all the time (otherwise refer to pylearn2 docs)
+    leakiness = float(arg.get('leakiness') or 0.01)
     init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
     n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
 
