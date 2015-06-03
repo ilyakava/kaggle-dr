@@ -250,7 +250,7 @@ planktonnetlite = [
 ]
 
 def train_vggnet(init_learning_rate, n_epochs,
-                 dataset, batch_size, cuda_convnet, leakiness, partial_sum):
+                 dataset, batch_size, cuda_convnet, leakiness, partial_sum, normalization):
     """
     :type learning_rate: float
     :param learning_rate: learning rate used (factor for the stochastic
@@ -270,22 +270,23 @@ def train_vggnet(init_learning_rate, n_epochs,
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [(input_image_size, input_image_channels)] + planktonnetlite
 
-    datasets = load_data(dataset, conserve_gpu_memory=True, center=1, image_shape=image_shape)
+    datasets = load_data(dataset, conserve_gpu_memory=True, center=normalization, image_shape=image_shape)
 
     column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec)
     column.train_column(init_learning_rate, n_epochs)
 
 
 if __name__ == '__main__':
-    arg_names = ['command', 'dataset', 'batch_size', 'cuda_convnet', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
+    arg_names = ['command', 'dataset', 'batch_size', 'cuda_convnet', 'normalization', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
     arg = dict(zip(arg_names, sys.argv))
 
     dataset = arg.get('dataset') or 'data/train_simple_crop.npz'
     batch_size = int(arg.get('batch_size') or 2)
     cuda_convnet = int(arg.get('cuda_convnet') or 0)
+    normalization = int(arg.get('normalization') or 0)
     partial_sum = int(arg.get('partial_sum') or 0) or None # 0 turns into None. None or 1 work all the time (otherwise refer to pylearn2 docs)
     leakiness = float(arg.get('leakiness') or 0.01)
     init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
     n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
 
-    train_vggnet(init_learning_rate=init_learning_rate, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum)
+    train_vggnet(init_learning_rate=init_learning_rate, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum, normalization=normalization)
