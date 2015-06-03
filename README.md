@@ -13,7 +13,7 @@ pip install -r requirements.txt
 sudo python setup.py install
 ```
 
-### Data
+### Download Data
 
 Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/data?trainLabels.csv.zip), run to unpack:
 
