@@ -30,7 +30,7 @@ class NetworkInput(object):
         self.output = input
 
 class VGGNet(Ciresan2012Column):
-    def __init__(self, datasets, batch_size=128, cuda_convnet=0, leakiness=0.01, params=None, model_spec=None, partial_sum=None):
+    def __init__(self, datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, params=None):
         """
         :param datasets: Array of train, val, test x,y tuples
 
@@ -249,8 +249,8 @@ planktonnetlite = [
     (1, 5)
 ]
 
-def train_vggnet(init_learning_rate=0.001, n_epochs=800,
-                 dataset='data/train_simple_crop.npz', batch_size=1000, cuda_convnet=0, leakiness=0.01, partial_sum=None):
+def train_vggnet(init_learning_rate, n_epochs,
+                 dataset, batch_size, cuda_convnet, leakiness, partial_sum):
     """
     :type learning_rate: float
     :param learning_rate: learning rate used (factor for the stochastic
@@ -272,14 +272,15 @@ def train_vggnet(init_learning_rate=0.001, n_epochs=800,
 
     datasets = load_data(dataset, conserve_gpu_memory=True, center=1, image_shape=image_shape)
 
-    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, model_spec=model_spec, partial_sum=partial_sum)
+    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec)
     column.train_column(init_learning_rate, n_epochs)
 
 
 if __name__ == '__main__':
-    arg_names = ['command', 'batch_size', 'cuda_convnet', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
+    arg_names = ['command', 'dataset', 'batch_size', 'cuda_convnet', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
     arg = dict(zip(arg_names, sys.argv))
 
+    dataset = arg.get('dataset') or 'data/train_simple_crop.npz'
     batch_size = int(arg.get('batch_size') or 2)
     cuda_convnet = int(arg.get('cuda_convnet') or 0)
     partial_sum = int(arg.get('partial_sum') or 0) or None # 0 turns into None. None or 1 work all the time (otherwise refer to pylearn2 docs)
@@ -287,4 +288,4 @@ if __name__ == '__main__':
     init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
     n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
 
-    train_vggnet(init_learning_rate=init_learning_rate, n_epochs=n_epochs, batch_size=batch_size, cuda_convnet=cuda_convnet, partial_sum=partial_sum)
+    train_vggnet(init_learning_rate=init_learning_rate, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum)
