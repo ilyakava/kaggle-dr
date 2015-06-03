@@ -169,7 +169,9 @@ class VGGNet(Ciresan2012Column):
         # create a list of all model parameters to be fit by gradient descent
         nonflat_params = [layer.params for layer in layers[1:]]
         self.params = [item for sublist in nonflat_params for item in sublist]
-        self.column_params = [model_spec, batch_size, cuda_convnet]
+        # TODO make ciresan not depend on the following order
+        # nkerns, batch_size, normalized_width, distortion, cuda_convnet
+        self.column_params = [model_spec, batch_size, 0, 0, cuda_convnet]
 
         # create a list of gradients for all model parameters
         grads = T.grad(cost, self.params)
