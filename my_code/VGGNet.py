@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 
+# mainstream
 import os
 import sys
 import time
-
+import cPickle
+import collections
 import numpy
-
+# Deep Learning
 import theano
 import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 from lasagne.nonlinearities import LeakyRectify
-
+# git submodules
 from ciresan.code.logistic_sgd import LogisticRegression, load_data
 from ciresan.code.mlp import HiddenLayer
 from ciresan.code.ciresan2012 import save_model, Ciresan2012Column
 from ciresan.code.convolutional_mlp import LeNetConvPoolLayer
-
-import cPickle
-import collections
+# this repo
+from my_code.graphics import SKULL
+import my_code.network_specs as S
 
 import pdb
 
@@ -30,7 +32,7 @@ class NetworkInput(object):
         self.output = input
 
 class VGGNet(Ciresan2012Column):
-    def __init__(self, datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, params=None):
+    def __init__(self, datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, pad=1, params=None):
         """
         :param datasets: Array of train, val, test x,y tuples
 
@@ -67,6 +69,13 @@ class VGGNet(Ciresan2012Column):
         # BUILD ACTUAL MODEL #
         ######################
         print '... building the column'
+        # NOTE: the word "layer" in the comments and variables refers to an object
+        # that can be instantiated, i.e. "layer" is an operation in the CN network
+        # (with inputs and outputs) and therefore refers to a region of the network that
+        # has some inputs and has some outputs. Again, "layer" does not refer to a group
+        # of parameters or a block of weights. Rather, "layer" is an object that can be
+        # instantiated and has params/weights as its attributes, as well as input/output
+        # as attributes
 
         # list to hold layers, each element must have an `output` property,
         # each element after the first one must also have a `params` property
@@ -86,13 +95,39 @@ class VGGNet(Ciresan2012Column):
             if (len(model_spec[i-1]) == 3) or (i == 1):
                 # int division will automatically round down to match ignore_border=T
                 # in theano.tensor.signal.downsample.max_pool_2d
-                additive = 0 if cuda_convnet else 2
-                layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
+                if pad:
+                    assert(model_spec[i-1][0] - 2*pad == 1) # must be able to handle edge pixels (plus no even conv filters allowed)
+                    additive = 0 if (cuda_convnet and (len(model_spec[i]) == 3)) else 2
+                    layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
+                else:
+                    layer_input_sizes[i] = ((layer_input_sizes[i-1] - model_spec[i-1][0]) / downsample) + 1
 
-        print layer_input_sizes
+        # print some info
+        print "[DEBUG] layers input widths: {}".format(layer_input_sizes)
+        layer_parameter_counts = [0] + [model_spec[i - 1][1]*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
+        print "[DEBUG] layer parameter sizes: {}".format(layer_parameter_counts)
+
+        layer_weight_count = numpy.zeros(len(model_spec))
+        for i in xrange(1,len(model_spec)):
+            layer_weight_count[i] = model_spec[i - 1][1]*layer_input_sizes[i]**2
+            if len(model_spec[i]) == 2:
+                layer_weight_count[i] *= model_spec[i][1]
+            else:
+                layer_weight_count[i] *= batch_size
+        print "[DEBUG] layer weight counts: {}".format(layer_weight_count)
+        # warning when FC layers are too big
+        FC_layers = numpy.array([-1] + [len(layer_spec) for layer_spec in model_spec[1:]]) == 2 # -1 to skip input
+        FC_layers_descending = layer_weight_count[FC_layers].tolist() == sorted(layer_weight_count[FC_layers])[::-1]
+        if not FC_layers_descending:
+            print SKULL
+            print "[WARNING] FC layers are not descending in weight counts"
+        # info for weight increase between conv and FC layers
+        first_FC_layer_index = min(numpy.where(FC_layers)[0])
+        weight_increase_into_FC = layer_weight_count[first_FC_layer_index] / layer_weight_count[first_FC_layer_index-1]
+        print "[INFO] Weights increased %f X from last CONV into first FC layer" % weight_increase_into_FC
+        # upto 50ish probably ok (network on: http://cs231n.github.io/convolutional-networks/)
+
         # create layers
-        print "cuda_convnet %i" % cuda_convnet
-        total_parameter_count = 0
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             iz = layer_input_sizes[i] # input size
@@ -100,13 +135,13 @@ class VGGNet(Ciresan2012Column):
 
             prev_layer_params = ps[1] * iz**2
             fltargs = dict(n_in=prev_layer_params, n_out=cs[1]) # n_out only relevant for FC layers
-            total_parameter_count += prev_layer_params
-            print i
+            print "[DEBUG] %i" % i
             if len(cs) == 3: # conv layer
                 image_shape = (ps[1], iz, iz, batch_size) if cuda_convnet else (batch_size, ps[1], iz, iz)
                 filter_shape = (ps[1], cs[0], cs[0], cs[1]) if cuda_convnet else (cs[1], ps[1], cs[0], cs[0])
                 print image_shape
                 print filter_shape
+                border_mode = 'full' if pad else 'valid'
                 layers[i] = LeNetConvPoolLayer(
                     rng,
                     input=layers[i-1].output,
@@ -115,9 +150,9 @@ class VGGNet(Ciresan2012Column):
                     poolsize=(cs[2], cs[2]),
                     cuda_convnet=cuda_convnet,
                     activation=lr,
-                    border_mode='full',
+                    border_mode=border_mode,
                     partial_sum=partial_sum,
-                    pad=1
+                    pad=pad
                 )
             elif i == (len(model_spec) - 1): # last softmax layer
                 print fltargs
@@ -125,7 +160,6 @@ class VGGNet(Ciresan2012Column):
                 layers[i] = LogisticRegression(input=layers[i-1].output, **fltargs)
             elif len(cs) == 2: # FC layer
                 print fltargs
-                # pdb.set_trace()
                 raw_in = layers[i-1].output
                 if len(ps) == 3: # previous layer was a conv layer
                     flt_input = raw_in.dimshuffle(3, 0, 1, 2).flatten(2) if cuda_convnet else raw_in.flatten(2)
@@ -134,7 +168,7 @@ class VGGNet(Ciresan2012Column):
                 layers[i] = HiddenLayer(rng, input=flt_input, activation=T.tanh, **fltargs)
 
         # going off of: http://cs231n.github.io/convolutional-networks/
-        print "Estimated memory usage is %f MB per input image" % round(total_parameter_count * 4e-6 * 3, 2)
+        print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
         # TODO change this to the kappa loss
         cost = layers[-1].negative_log_likelihood(y)
 
@@ -204,53 +238,6 @@ class VGGNet(Ciresan2012Column):
             }
         )
 
-# also called vgg A
-vgg_11 = [
-    (3,64,2), # 64 3x3 filters with 2x2 maxpooling after
-    (3,128,2),
-    (3,256,1), # no maxpool after
-    (3,256,2),
-    (3,512,1),
-    (3,512,2),
-    (3,512,1),
-    (3,512,2),
-    (1, 4096), # FC layer
-    (1, 4096),
-    (1, 5), # FC, probably thin this out a different way
-    (1, 5) # softmax
-]
-
-# only difference is smaller pooling window
-planktonnet = [
-    (3,32,1),
-    (3,16,2),
-    (3,64,1),
-    (3,32,2),
-    (3,128,1),
-    (3,128,1),
-    (3,64,2),
-    (3,256,1),
-    (3,256,1),
-    (3,128,2),
-    (1, 512),
-    (1, 512),
-    (1, 5),
-    (1, 5)
-]
-
-planktonnetlite = [
-    (3,16,2),
-    (3,32,2),
-    (3,64,1),
-    (3,32,2),
-    (3,128,1),
-    (3,64,2),
-    (1, 256),
-    (1, 256),
-    (1, 5),
-    (1, 5)
-]
-
 def train_vggnet(init_learning_rate, n_epochs,
                  dataset, batch_size, cuda_convnet, leakiness, partial_sum, normalization):
     """
@@ -267,14 +254,14 @@ def train_vggnet(init_learning_rate, n_epochs,
     :type nkerns: list of ints
     :param nkerns: number of kernels on each layer
     """
-    input_image_size = 112
-    input_image_channels = 3
+    input_image_size, input_image_channels, normalized_width, pad, netspec = 69, 1, 60, 0, S.galaxynet_lessFC
+
     image_shape = (input_image_size, input_image_size, input_image_channels)
-    model_spec = [(input_image_size, input_image_channels)] + planktonnetlite
+    model_spec = [(input_image_size, input_image_channels)] + netspec
 
-    datasets = load_data(dataset, conserve_gpu_memory=True, center=normalization, image_shape=image_shape)
+    datasets = load_data(dataset, out_image_size=input_image_size, normalized_width=normalized_width, conserve_gpu_memory=True, center=normalization, image_shape=image_shape)
 
-    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec)
+    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, pad=pad)
     column.train_column(init_learning_rate, n_epochs)
 
 
