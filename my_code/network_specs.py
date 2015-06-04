@@ -12,7 +12,7 @@ vgg_11 = [
     (1, 4096),
     (1, 5), # FC, probably thin this out a different way
     (1, 5) # softmax
-]
+] # unique id when useful for citing in notebook
 
 # only difference is smaller pooling window
 planktonnet_lesspool = [
@@ -45,6 +45,9 @@ planktonnet_lesspool_lite = [
     (1, 5)
 ]
 
+# This is an example of what not to do. FC is too large
+# In the real network 16 columns of conv layers plug into
+# one FC layer
 galaxynet = [
     (6,32,2),
     (5,64,2),
@@ -102,6 +105,7 @@ galaxynet_lessFC = [
     (1,10)
 ] # rtCZoJXXKL3feLluk95A4bjXZy6zDsMf
 
+# This is an example of what not to do. FC is too large
 ciresan2012_cuco_pad1_galaxyapprox3 = [
     (3, 32, 2),
     (3, 32, 2),
