@@ -71,7 +71,7 @@ def create_train_val_set(image_directory, label_csv, valid_set_size, test_set_si
     train_proportions = [sum(numpy.array(train_dataset.values()) == klass)/float(len(train_dataset.values())) for klass in reversed(xrange(K))]
     print("Train: {}".format(train_proportions))
 
-    # pickle the selection
+    print("Pickling the Train/Valid/Test Partitions")
     package_data(image_directory, (train_dataset, valid_dataset, test_dataset), image_shape, outfile_path)
 
 if __name__ == '__main__':
