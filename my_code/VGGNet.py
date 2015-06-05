@@ -151,7 +151,7 @@ class VGGNet(Ciresan2012Column):
                     input=layers[i-1].output,
                     filter_shape=filter_shape, # (prev_thickness, convx, convy, cur_thickness)
                     image_shape=image_shape, # (prev_thickness, cur_size, cur_size, bs)
-                    poolsize=(cs[2], cs[-1]), # ds, stride
+                    poolsize=(cs[-1], cs[2]), # ds, stride
                     cuda_convnet=cuda_convnet,
                     activation=lr,
                     border_mode=border_mode,
