@@ -1,7 +1,17 @@
 import numpy
 from sklearn.metrics import confusion_matrix
 
+import pdb
+
 K = 5 # num classes
+
+def print_confusion_matrix(M):
+    print("Confusion Matrix")
+    print("T\P|    0 |    1 |    2 |    3 |    4 |")
+    print("---|------|------|------|------|------|")
+    for i, y in enumerate(xrange(K)):
+        print(" %d | %4d | %4d | %4d | %4d | %4d |" % ((y, ) + tuple(M[i])))
+        print("---|------|------|------|------|------|")
 
 def QWK(y_true, y_pred):
     """
@@ -20,4 +30,4 @@ def QWK(y_true, y_pred):
     Mf = M.flatten()
     df = d.flatten()
     score = 1 - (sum(df * Mf)/sum(Mf)) / (sum(df * Ef) / sum(Ef))
-    return score
+    return [score, M]

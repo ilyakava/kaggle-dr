@@ -9,6 +9,9 @@
             [3,256,2,3],
             [1,512],
             [1,512]
+        ],
+        "trials": [
+            "3rd run is getting 4.45 mins per epoch but validation error still seems random."
         ]
     },
     "vgg_mini6" : {

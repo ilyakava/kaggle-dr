@@ -22,7 +22,7 @@ from ciresan.code.ciresan2012 import Ciresan2012Column
 from ciresan.code.convolutional_mlp import LeNetConvPoolLayer
 # this repo
 from my_code.graphics import SKULL
-from my_code.util import QWK
+from my_code.util import QWK, print_confusion_matrix
 
 import pdb
 
@@ -345,7 +345,9 @@ def kappa_function(dataset, y_index):
     y_true_full = ys[y_index]
     def kappa(y_pred):
         y_true = y_true_full[:len(y_pred)]
-        return QWK(y_true, y_pred)
+        k, M = QWK(y_true, y_pred)
+        print_confusion_matrix(M)
+        return k
     return kappa
 
 def save_results(filename, params):
