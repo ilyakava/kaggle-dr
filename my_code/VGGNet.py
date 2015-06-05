@@ -83,28 +83,27 @@ class VGGNet(Ciresan2012Column):
 
         # list to hold layers, each element must have an `output` property,
         # each element after the first one must also have a `params` property
-        layers = [None] * len(model_spec)
-        # stick in the images as "0th" layer
+        layers = [None] * len(model_spec) # stick in the images as "0th" layer
         # TODO get rid of dimshuffle
         raw_image_data = x.reshape((batch_size, model_spec[0][1], model_spec[0][0], model_spec[0][0]))
         network_input = raw_image_data.dimshuffle(1, 2, 3, 0) if cuda_convnet else raw_image_data
         layers[0] = NetworkInput(network_input)
 
-        # precompute layer sizes: not (prev_size - cur_conv / maxpool degree) since we are padding images
+        # precompute layer sizes
         layer_input_sizes = numpy.ones(len(model_spec), dtype=int)
         layer_input_sizes[0] = model_spec[0][0]
         layer_input_sizes[1] = layer_input_sizes[0]
         for i in xrange(2,len(model_spec)):
-            downsample = model_spec[i-1][2] if (len(model_spec[i-1]) == 3) else 1
-            if (len(model_spec[i-1]) == 3) or (i == 1):
+            downsample = model_spec[i-1][2] if (len(model_spec[i-1]) >= 3) else 1
+            if (len(model_spec[i-1]) >= 3) or (i == 1):
                 # int division will automatically round down to match ignore_border=T
                 # in theano.tensor.signal.downsample.max_pool_2d
                 if pad:
                     assert(model_spec[i-1][0] - 2*pad == 1) # must be able to handle edge pixels (plus no even conv filters allowed)
-                    # additive = 0 if (cuda_convnet and (len(model_spec[i]) == 3)) else 2 # can't remember what this has to do with (maybe it is with odd sizes? will discover later)
+                    # additive = 0 if (cuda_convnet and (len(model_spec[i]) >= 3)) else 2 # can't remember what this has to do with (maybe it is with odd sizes? will discover later)
                     additive = 0 if cuda_convnet else 2
                     layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
-                else:
+                else: #(prev_size - cur_conv / maxpool degree)
                     layer_input_sizes[i] = ((layer_input_sizes[i-1] - model_spec[i-1][0]) / downsample) + 1
 
         # print some info
@@ -115,7 +114,7 @@ class VGGNet(Ciresan2012Column):
         layer_weight_count = numpy.zeros(len(model_spec))
         for i in xrange(1,len(model_spec)):
             layer_weight_count[i] = model_spec[i - 1][1]*layer_input_sizes[i]**2
-            if len(model_spec[i]) == 2:
+            if len(model_spec[i]) == 2: # FC layer
                 layer_weight_count[i] *= model_spec[i][1]
             else:
                 layer_weight_count[i] *= batch_size
@@ -141,7 +140,7 @@ class VGGNet(Ciresan2012Column):
             prev_layer_params = ps[1] * iz**2
             fltargs = dict(n_in=prev_layer_params, n_out=cs[1]) # n_out only relevant for FC layers
             print "[DEBUG] Layer %i" % i
-            if len(cs) == 3: # conv layer
+            if len(cs) >= 3: # conv layer
                 image_shape = (ps[1], iz, iz, batch_size) if cuda_convnet else (batch_size, ps[1], iz, iz)
                 filter_shape = (ps[1], cs[0], cs[0], cs[1]) if cuda_convnet else (cs[1], ps[1], cs[0], cs[0])
                 print image_shape
@@ -152,7 +151,7 @@ class VGGNet(Ciresan2012Column):
                     input=layers[i-1].output,
                     filter_shape=filter_shape, # (prev_thickness, convx, convy, cur_thickness)
                     image_shape=image_shape, # (prev_thickness, cur_size, cur_size, bs)
-                    poolsize=(cs[2], cs[2]),
+                    poolsize=(cs[2], cs[-1]), # ds, stride
                     cuda_convnet=cuda_convnet,
                     activation=lr,
                     border_mode=border_mode,
@@ -166,7 +165,7 @@ class VGGNet(Ciresan2012Column):
             elif len(cs) == 2: # FC layer
                 print fltargs
                 raw_in = layers[i-1].output
-                if len(ps) == 3: # previous layer was a conv layer
+                if len(ps) >= 3: # previous layer was a conv layer
                     flt_input = raw_in.dimshuffle(3, 0, 1, 2).flatten(2) if cuda_convnet else raw_in.flatten(2)
                 else:
                     flt_input = raw_in
