@@ -1,5 +1,6 @@
 ## Getting Started
 
+
 ### Clone Code from ciresan and theanet
 
 `git submodule update --init --recursive`
@@ -12,6 +13,10 @@ cd Lasagne/
 pip install -r requirements.txt
 sudo python setup.py install
 ```
+
+### General Python deps:
+
+`pip install -U scikit-learn`
 
 ### Download & Unpack Data
 

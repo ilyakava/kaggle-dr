@@ -1,0 +1,15 @@
+{
+    "vgg_mini6" : {
+        "rec_input_size": 112,
+        "pad": 1,
+        "layers": [
+            [3,64,2],
+            [3,128,2],
+            [3,256,2],
+            [3,512,2],
+            [1,256],
+            [1,256]
+        ],
+        "notes": "first run, total failure, kappa wouldn't budge from 0. 9 mins per epoch. Error seemed pretty random and oscillated between 26.328125 and 85.312500."
+    }
+}
