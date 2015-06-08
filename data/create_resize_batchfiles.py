@@ -6,6 +6,7 @@ import numpy
 import pdb
 
 def gm_batchfiles(groups, size, in_dir, out_dir, func):
+    # creates on batchfile
     outfiles = []
     for index, group in enumerate(groups):
         outfiles.append(func(group, size, in_dir, out_dir, index))
@@ -20,6 +21,15 @@ def simple_crop_batchfile(files, size, in_dir, out_dir, index):
     out.close()
     return name
 
+def centered_crop_batchfile(files, size, in_dir, out_dir, index):
+    name = "data/convert/centered_crop_batchfile_%i.txt" % index
+    out = open(name, 'w')
+    for f_ in files:
+        f = '.'.join([f_.split('.')[0], 'png'])
+        cmd = 'convert %s%s -format png -bordercolor black -border 1x1 -fuzz 10%% -trim +repage -gravity center -resize %i -background black -gravity center -extent %ix%i %s%s\n' % (in_dir, f_, size, size, size, out_dir, f)
+        out.write (cmd)
+    out.close()
+    return name
 
 if __name__ == '__main__':
     arg_names = ['command', 'in_dir', 'out_dir', 'mode', 'size', 'num_batch_files']
@@ -41,6 +51,8 @@ if __name__ == '__main__':
 
     if mode == 1:
         print gm_batchfiles(groups, size, in_dir, out_dir, simple_crop_batchfile)
+    elif mode == 2:
+        print gm_batchfiles(groups, size, in_dir, out_dir, centered_crop_batchfile)
     else:
         raise ValueError("unsupported mode %i" % mode)
 
