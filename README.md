@@ -37,8 +37,8 @@ requires graphicsmagick
 Ex:
 
 ```
-mkdir data/train/simple_crop
-python data/create_resize_batchfiles.py
+mkdir data/train/128_simple
+python data/create_resize_batchfiles.py data/train/orig/ data/train/128_simple/ 1 128
 ```
 
 #### Standardization
