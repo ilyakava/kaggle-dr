@@ -24,7 +24,7 @@
             [1,512]
         ],
         "trials": [
-            "3rd run is getting 4.45 mins per epoch but validation error still seems random. Confusion matrix shows that the model just puts all the images into one class. After 9th epoch, it puts them all in class 3, 2 mostly, but also 4 sometimes, and then 1 forever. Which is pretty odd."
+            "3rd run is getting 4.45 mins per epoch but validation error still seems random. Confusion matrix shows that the model just puts all the images into one class. After 9th epoch, it puts them all in class 3, 2 mostly, but also 4 sometimes, and then 1 forever. Which is pretty odd.",
             "centering and normalizing across channels now. Still not getting away from kappa, but guessed all 2 instead of all 0 first..."
         ]
     },
