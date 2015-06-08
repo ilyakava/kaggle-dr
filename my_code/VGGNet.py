@@ -358,7 +358,7 @@ def save_results(filename, params):
     f.close()
 
 def train_vggnet(network, init_learning_rate, n_epochs, dataset,
-                 batch_size, cuda_convnet, leakiness, partial_sum, normalization):
+                 batch_size, cuda_convnet, leakiness, partial_sum, center, normalize):
     """
     :type learning_rate: float
     :param learning_rate: learning rate used (factor for the stochastic
@@ -381,7 +381,7 @@ def train_vggnet(network, init_learning_rate, n_epochs, dataset,
         netspec = network['layers']
         pad = network['pad']
         input_image_size = network['rec_input_size']
-        normalized_width = int(input_image_size * 0.9) # only relevant if mnist
+        digit_normalized_width = int(input_image_size * 0.9) # only relevant if mnist
 
     input_image_channels = 1 if dataset == 'data/mnist.pkl.gz' else 3
     output_classes = 10 if dataset == 'data/mnist.pkl.gz' else 5
@@ -390,7 +390,7 @@ def train_vggnet(network, init_learning_rate, n_epochs, dataset,
     image_shape = [input_image_size, input_image_size, input_image_channels] # only relevant if mean is subtracted
     model_spec = [[input_image_size, input_image_channels]] + netspec + [[1, output_classes]]
 
-    datasets = load_data(dataset, out_image_size=input_image_size, normalized_width=normalized_width, conserve_gpu_memory=True, center=normalization, image_shape=image_shape) # only relevant if mean is subtracted
+    datasets = load_data(dataset, digit_out_image_size=input_image_size, digit_normalized_width=digit_normalized_width, conserve_gpu_memory=True, center=center, normalize=normalize, image_shape=image_shape) # only relevant if mean is subtracted
 
     column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, pad=pad)
     try:
@@ -401,17 +401,18 @@ def train_vggnet(network, init_learning_rate, n_epochs, dataset,
     save_results(runid, [column.historical_costs, column.historical_val_losses, column.historical_val_custom_losses])
 
 if __name__ == '__main__':
-    arg_names = ['command', 'network', 'dataset', 'batch_size', 'cuda_convnet', 'normalization', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
+    arg_names = ['command', 'network', 'dataset', 'batch_size', 'cuda_convnet', 'center', 'normalize', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
     arg = dict(zip(arg_names, sys.argv))
 
     network = arg.get('network') or 'vgg_mini6'
     dataset = arg.get('dataset') or 'data/train_simple_crop.npz'
     batch_size = int(arg.get('batch_size') or 2)
     cuda_convnet = int(arg.get('cuda_convnet') or 0)
-    normalization = int(arg.get('normalization') or 0)
+    center = int(arg.get('center') or 0)
+    normalize = int(arg.get('normalize') or 0)
     partial_sum = int(arg.get('partial_sum') or 0) or None # 0 turns into None. None or 1 work all the time (otherwise refer to pylearn2 docs)
     leakiness = float(arg.get('leakiness') or 0.01)
     init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
     n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
 
-    train_vggnet(network=network, init_learning_rate=init_learning_rate, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum, normalization=normalization)
+    train_vggnet(network=network, init_learning_rate=init_learning_rate, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum, center=center, normalize=normalize)
