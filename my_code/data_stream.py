@@ -19,7 +19,7 @@ class DataStream(object):
     def valid_set(self):
         all_val_images = numpy.zeros(((len(self.valid_dataset),) + self.image_shape), dtype=numpy.float32)
         for i, image in enumerate(self.valid_dataset):
-            all_val_images[i, ...] = imread(self.image_dir + image)
+            all_val_images[i, ...] = imread(self.image_dir + image) # b01c, Theano: bc01 CudaConvnet: c01b
         return numpy.rollaxis(all_val_images, 3, 1), numpy.array(self.valid_dataset.values(), dtype=numpy.int32)[numpy.newaxis].T
 
     def train_buffer(self):
@@ -35,4 +35,3 @@ class DataStream(object):
             for i, image in enumerate(self.train_dataset.keys()[ith_cache_block_slice]):
                 x_cache_block[i, ...] = imread(self.image_dir + image)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(self.train_dataset.values()[ith_cache_block_slice], dtype=numpy.int32)[numpy.newaxis].T
-            # do we need to close the images?
