@@ -3,13 +3,11 @@ import csv
 import random
 import numpy
 
-from ciresan.code.package_data import package_data
-
 import pdb
 
 K = 5 # num classes
 
-def create_train_val_set(image_directory, label_csv, valid_set_size, test_set_size, image_shape, outfile_path):
+def create_train_val_test_set(label_csv, valid_set_size, test_set_size, extension=".jpeg"):
     # create set of int ids
     id_to_y = {} # just a reference
     y_to_id = {0:[], 1:[], 2:[], 3:[], 4:[]} # acts as our pool
@@ -39,7 +37,7 @@ def create_train_val_set(image_directory, label_csv, valid_set_size, test_set_si
         test_set_y_recruits = random.sample(y_to_id[y], num_ys_wanted)
         # add these to test set and remove from pool
         for id in test_set_y_recruits:
-            test_dataset["%s.jpeg" % id] = id_to_y[id]
+            test_dataset["%s%s" % (id, extension)] = id_to_y[id]
             y_to_id[y].remove(id)
 
     valid_dataset = {}
@@ -54,38 +52,21 @@ def create_train_val_set(image_directory, label_csv, valid_set_size, test_set_si
         test_set_y_recruits = random.sample(y_to_id[y], num_ys_wanted)
         # add these to test set and remove from pool
         for id in test_set_y_recruits:
-            valid_dataset["%s.jpeg" % id] = id_to_y[id]
+            valid_dataset["%s%s" % (id, extension)] = id_to_y[id]
             y_to_id[y].remove(id)
 
     train_dataset = {}
     for ids in y_to_id.values():
         for id in ids:
-            train_dataset["%s.jpeg" % id] = id_to_y[id]
+            train_dataset["%s%s" % (id, extension)] = id_to_y[id]
 
     print("Final Descending Proportions")
     print("All:   {}".format(proportions))
-    test_proportions = [sum(numpy.array(test_dataset.values()) == klass)/float(len(test_dataset.values())) for klass in reversed(xrange(K))]
+    test_proportions = [sum(numpy.array(test_dataset.values()) == klass)/float(len(test_dataset.values()) + numpy.spacing(1)) for klass in reversed(xrange(K))]
     print("Test:  {}".format(test_proportions))
-    valid_proportions = [sum(numpy.array(valid_dataset.values()) == klass)/float(len(valid_dataset.values())) for klass in reversed(xrange(K))]
+    valid_proportions = [sum(numpy.array(valid_dataset.values()) == klass)/float(len(valid_dataset.values()) + numpy.spacing(1)) for klass in reversed(xrange(K))]
     print("Valid: {}".format(valid_proportions))
-    train_proportions = [sum(numpy.array(train_dataset.values()) == klass)/float(len(train_dataset.values())) for klass in reversed(xrange(K))]
+    train_proportions = [sum(numpy.array(train_dataset.values()) == klass)/float(len(train_dataset.values()) + numpy.spacing(1)) for klass in reversed(xrange(K))]
     print("Train: {}".format(train_proportions))
 
-    print("Pickling the Train/Valid/Test Partitions")
-    package_data(image_directory, (train_dataset, valid_dataset, test_dataset), image_shape, outfile_path)
-
-if __name__ == '__main__':
-    arg_names = ['command', 'image_directory', 'outfile_path', 'valid_set_size', 'test_set_size', 'height', 'channels', 'label_csv']
-    arg = dict(zip(arg_names, sys.argv))
-
-    image_directory = arg.get('image_directory') or 'data/train/simple_crop/'
-    outfile_path = arg.get('outfile_path') or 'data/train_testA.npz'
-    valid_set_size = int(arg.get('valid_set_size') or 4864)
-    test_set_size = int(arg.get('test_set_size') or 128)
-    height = int(arg.get('height') or 112)
-    channels = int(arg.get('channels') or 3)
-    label_csv = arg.get('label_csv') or 'data/trainLabels.csv'
-
-    image_shape = (height, height, channels)
-
-    create_train_val_set(image_directory, label_csv, valid_set_size, test_set_size, image_shape, outfile_path)
+    return (train_dataset, valid_dataset, test_dataset)

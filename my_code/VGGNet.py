@@ -14,66 +14,73 @@ import theano
 import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
-from lasagne.nonlinearities import LeakyRectify
 import lasagne
 from lasagne import layers
 # git submodules
-from ciresan.code.logistic_sgd import LogisticRegression, load_data
-from ciresan.code.mlp import HiddenLayer
 from ciresan.code.ciresan2012 import Ciresan2012Column
-from ciresan.code.convolutional_mlp import LeNetConvPoolLayer
 # this repo
-from my_code.graphics import SKULL
 from my_code.util import QWK, print_confusion_matrix
+from my_code.data_stream import DataStream
 
 import pdb
 
-MOMENTUM = 0.9
-
 class VGGNet(Ciresan2012Column):
-    def __init__(self, datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, pad=1, params=None):
-        """
-        :param datasets: Array of train, val, test x,y tuples
-
-        :param params: W/b weights in the order ...
-        """
-        # anything that we would need to reinstantiate the column should be saved here
+    def __init__(self, data_stream, batch_size, learning_rate, momentum, cuda_convnet, leakiness, partial_sum, model_spec, pad=1, params=None):
         self.column_params = [batch_size, cuda_convnet, leakiness, partial_sum, model_spec, pad]
-        rng = numpy.random.RandomState(23455)
+        layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad, cuda_convnet)
+        print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
+        print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
+        # data setup
+        self.ds = data_stream
+        self.n_valid_batches = len(self.ds.valid_dataset) // batch_size
+        self.n_train_batches = len(self.ds.train_dataset) // batch_size
 
-        # TODO: could make this a theano sym variable to abstract
-        # loaded data from column instantiation
-        train_set_x, train_set_y = datasets[0]
-        valid_set_x, valid_set_y = datasets[1]
-        test_set_x, test_set_y = datasets[2]
+        self.train_x, self.train_y = self.ds.train_buffer().next()
+        self.batches_per_cache_block = len(self.train_x) // batch_size
+        self.train_x = theano.shared(lasagne.utils.floatX(self.train_x))
+        self.train_y = theano.shared(self.train_y)
 
-        # TODO: could move this to train method
-        # compute number of minibatches for training, validation and testing
-        self.n_train_batches = train_set_x.get_value(borrow=True).shape[0]
-        self.n_valid_batches = valid_set_x.get_value(borrow=True).shape[0]
-        self.n_test_batches = test_set_x.get_value(borrow=True).shape[0]
-        self.n_train_batches /= batch_size
-        self.n_valid_batches /= batch_size
-        self.n_test_batches /= batch_size
+        valid_x, self.valid_y = self.ds.valid_set()
+        valid_x = theano.shared(lasagne.utils.floatX(valid_x))
+        self.valid_y = theano.shared(self.valid_y)
+        # build model
+        all_layers = self.build_model(model_spec, layer_input_sizes, pad)
 
-        # allocate symbolic variables for the data
-        index = T.lscalar()  # index to a [mini]batch
-        learning_rate = T.fscalar()
+        cache_block_index = T.iscalar('cache_block_index')
+        X_batch = T.tensor4('x')
+        y_batch = T.imatrix('y')
 
-        # start-snippet-1
-        x = T.tensor4('x')   # the data is presented as rasterized images
-        y = T.ivector('y')  # the labels are presented as 1D vector of
-                            # [int] labels
-        lr = LeakyRectify(leakiness)
+        batch_slice = slice(cache_block_index * batch_size, (cache_block_index + 1) * batch_size)
 
-        ######################
-        # BUILD ACTUAL MODEL #
-        ######################
-        print '... building the column'
+        objective = lasagne.objectives.Objective(all_layers[-1], loss_function=lasagne.objectives.mse)
 
-        all_layers = [layers.InputLayer(shape=(None, model_spec[0][1], model_spec[0][0], model_spec[0][0]))]
+        loss_train = objective.get_loss(X_batch, target=y_batch)
+        loss_valid = objective.get_loss(X_batch, target=y_batch, deterministic=True)
 
-        # precompute layer sizes
+        pred = T.iround(all_layers[-1].get_output(X_batch, deterministic=True))
+
+        self.params = lasagne.layers.get_all_params(all_layers[-1])
+        updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
+
+        print("Compiling...")
+
+        self.train_batch = theano.function(
+            [cache_block_index], loss_train,
+            updates=updates,
+            givens={
+                X_batch: self.train_x[batch_slice],
+                y_batch: self.train_y[batch_slice],
+            },
+        )
+        self.validate_batch = theano.function(
+            [cache_block_index], [loss_valid, pred],
+            givens={
+                X_batch: valid_x[batch_slice],
+                y_batch: self.valid_y[batch_slice],
+            },
+        )
+
+    def precompute_layer_sizes(self, model_spec, pad, cuda_convnet):
         layer_input_sizes = numpy.ones(len(model_spec), dtype=int)
         layer_input_sizes[0] = model_spec[0][0]
         layer_input_sizes[1] = layer_input_sizes[0]
@@ -89,33 +96,12 @@ class VGGNet(Ciresan2012Column):
                     layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
                 else: #(prev_size - cur_conv / maxpool degree)
                     layer_input_sizes[i] = ((layer_input_sizes[i-1] - model_spec[i-1][0]) / downsample) + 1
-
-        # print some info
-        print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
         layer_parameter_counts = [0] + [model_spec[i - 1][1]*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
-        print "[DEBUG] layer parameter sizes: {}".format(layer_parameter_counts)
+        return [layer_input_sizes, layer_parameter_counts]
 
-        layer_weight_count = numpy.zeros(len(model_spec))
-        for i in xrange(1,len(model_spec)):
-            layer_weight_count[i] = model_spec[i - 1][1]*layer_input_sizes[i]**2
-            if len(model_spec[i]) == 2: # FC layer
-                layer_weight_count[i] *= model_spec[i][1]
-            else:
-                layer_weight_count[i] *= batch_size
-        print "[DEBUG] layer weight counts: {}".format(layer_weight_count)
-        # warning when FC all_layers are too big
-        FC_all_layers = numpy.array([-1] + [len(layer_spec) for layer_spec in model_spec[1:]]) == 2 # -1 to skip input
-        FC_all_layers_descending = layer_weight_count[FC_all_layers].tolist() == sorted(layer_weight_count[FC_all_layers])[::-1]
-        if not FC_all_layers_descending:
-            print SKULL
-            print "[WARNING] FC all_layers are not descending in weight counts"
-        # info for weight increase between conv and FC all_layers
-        first_FC_layer_index = min(numpy.where(FC_all_layers)[0])
-        weight_increase_into_FC = layer_weight_count[first_FC_layer_index] / layer_weight_count[first_FC_layer_index-1]
-        print "[INFO] Weights increased %f X from last CONV into first FC layer" % weight_increase_into_FC
-        # upto 50ish probably ok (network on: http://cs231n.github.io/convolutional-networks/)
-
-        # create all_layers
+    def build_model(self, model_spec, layer_input_sizes, pad):
+        print("Building model from JSON...")
+        all_layers = [layers.InputLayer(shape=(None, model_spec[0][1], model_spec[0][0], model_spec[0][0]))]
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             iz = layer_input_sizes[i] # input size
@@ -124,197 +110,85 @@ class VGGNet(Ciresan2012Column):
             prev_layer_params = ps[1] * iz**2
             fltargs = dict(n_in=prev_layer_params, n_out=cs[1]) # n_out only relevant for FC all_layers
             print "[DEBUG] Layer %i" % i
-            if len(cs) >= 3: # conv layer
+            if len(cs) >= 3: # CONV layer
                 image_shape = (ps[1], iz, iz, batch_size) if cuda_convnet else (batch_size, ps[1], iz, iz)
                 filter_shape = (ps[1], cs[0], cs[0], cs[1]) if cuda_convnet else (cs[1], ps[1], cs[0], cs[0])
                 print image_shape
                 print filter_shape
                 border_mode = 'full' if pad else 'valid'
                 all_layers.append(layers.Conv2DLayer(all_layers[-1],
-                                    num_filters=image_shape[1],
-                                    filter_size=(filter_shape[2], filter_shape[3]),
+                                    num_filters=cs[1],
+                                    filter_size=(cs[0], cs[0]),
                                     W=lasagne.init.Normal()))
                 all_layers.append(layers.MaxPool2DLayer(all_layers[-1], (cs[-1], cs[-1])))
-            elif i == (len(model_spec) - 1): # last softmax layer
-                print fltargs
-                assert(len(ps) == 2) # must follow an FC layer
-                all_layers.append(layers.DenseLayer(all_layers[-1],
-                                   num_units=1,
-                                   nonlinearity=None))
             elif len(cs) == 2: # FC layer
                 print fltargs
                 all_layers.append((layers.DenseLayer(all_layers[-1],
                                    num_units=cs[1],
                                    W=lasagne.init.Normal())))
                 all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=0.5))
+            else:
+                raise NotImplementedError()
+        # output layer
+        all_layers.append(layers.DenseLayer(all_layers[-1],
+                           num_units=1,
+                           nonlinearity=None))
+        return all_layers
 
-        # going off of: http://cs231n.github.io/convolutional-networks/
-        print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
-        objective = lasagne.objectives.Objective(all_layers[-1], loss_function=lasagne.objectives.mse)
-        cost = objective.get_loss(x, target=y.reshape((batch_size,1)))
+    def train_epoch(self):
+        """
+        Is responsible for moving the data stream into the column's variables
+        :return: minibatch training error
+        """
+        for x_cache_block, y_cache_block in self.ds.train_buffer():
+            self.train_x.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
+            self.train_y.set_value(y_cache_block, borrow=True)
 
-        # return error of train batch
-        self.test_model = theano.function(
-            [index],
-            cost,
-            givens={
-                x: test_set_x[index * batch_size: (index + 1) * batch_size],
-                y: test_set_y[index * batch_size: (index + 1) * batch_size]
-            }
-        )
+            for i in xrange(self.batches_per_cache_block):
+                batch_loss = self.train_batch(i)
+                yield batch_loss
 
-        # return outputs of valid batch
-        self.valid_output_batch = theano.function(
-            [index],
-            T.iround(lasagne.layers.get_output(all_layers[-1], x, deterministic=True)),
-            givens={
-                x: valid_set_x[index * batch_size: (index + 1) * batch_size]
-            }
-        )
+    def validate(self, silent=False):
+        """
+        Iterates through validation minibatches
+        """
+        batch_valid_losses = []
+        valid_predictions = []
+        for j in range(self.n_valid_batches):
+            batch_valid_loss, prediction = self.validate_batch(j)
+            batch_valid_losses.append(batch_valid_loss)
+            valid_predictions.extend(prediction)
+        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions))
+        if not silent:
+            print_confusion_matrix(M)
+        val_loss = numpy.mean(batch_valid_losses)
+        return [val_loss, kappa]
 
-        # return error of valid batch
-        self.validate_model = theano.function(
-            [index],
-            objective.get_loss(x, target=y.reshape((batch_size,1)), deterministic=True),
-            givens={
-                x: valid_set_x[index * batch_size: (index + 1) * batch_size],
-                y: valid_set_y[index * batch_size: (index + 1) * batch_size]
-            }
-        )
-
-        # create a list of all model parameters to be fit by gradient descent
-        self.params = lasagne.layers.get_all_params(all_layers[-1])
-        updates = lasagne.updates.nesterov_momentum(cost, self.params, learning_rate, MOMENTUM)
-
-        # Suggested by Alex Krizhevsky, found on:
-        # http://yyue.blogspot.com/2015/01/a-brief-overview-of-deep-learning.html
-        # optimal_ratio = 0.001
-        # # should show what multiple current learning rate is of optimal learning rate
-        # grads = T.grad(cost, self.params)
-        # grads_L1 = sum([abs(grad).sum() for grad in grads])
-        # params_L1 = sum([abs(param).sum() for param in self.params])
-        # update_ratio = (learning_rate/(optimal_ratio)) * (grads_L1/params_L1)
-
-        self.train_model = theano.function(
-            [index, learning_rate],
-            [cost],
-            updates=updates,
-            givens={
-                x: train_set_x[index * batch_size: (index + 1) * batch_size],
-                y: train_set_y[index * batch_size: (index + 1) * batch_size]
-            }
-        )
-
-    def valid_outputs(self):
-        valid_losses = [
-            self.valid_output_batch(i)
-            for i in xrange(self.n_valid_batches)
-        ]
-        return numpy.concatenate(valid_losses)
-
-    def train_column(self, init_learning_rate, n_epochs, custom_loss=None):
-        print '... training (%i iters per epoch)' % self.n_train_batches
-        # early-stopping parameters
-        patience = 10000  # look as this many examples regardless
-        patience_increase = 2  # wait this much longer when a new best is
-                               # found
-        improvement_threshold = 0.995  # a relative improvement of this much is
-                                       # considered significant
-        validation_frequency = min(self.n_train_batches, patience / 2)
-                                      # go through this many
-                                      # minibatche before checking the network
-                                      # on the validation set; in this case we
-                                      # check every epoch
-
-        best_validation_loss = numpy.inf
-        best_iter = 0
-        test_score = 0.
+    def train_column(self, n_epochs):
         start_time = time.clock()
-
         epoch = 0
-        done_looping = False
-        final_learning_rate = init_learning_rate * 0.993**500
-
-        self.historical_costs = []
+        validation_frequency = 24 # in multiples of minibatches, i.e. iters
+        iter = 0
+        self.historical_train_losses = []
         self.historical_val_losses = []
-        self.historical_val_custom_losses = []
-
-        while (epoch < n_epochs) and (not done_looping):
-            cur_learning_rate = max(numpy.array([init_learning_rate * 0.993**epoch, final_learning_rate], dtype=numpy.float32))
-            epoch = epoch + 1
-            for minibatch_index in xrange(self.n_train_batches):
-
-                iter = (epoch - 1) * self.n_train_batches + minibatch_index
-
-                cost_ij = self.train_model(minibatch_index, cur_learning_rate)
-                self.historical_costs.append([iter, cost_ij])
-
-                if iter % 100 == 0:
-                    print 'training @ iter = %i. Cur learning rate is %f' % (iter, cur_learning_rate)
+        self.historical_val_kappas = []
+        while epoch < n_epochs:
+            epoch += 1
+            for batch_train_loss in self.train_epoch():
+                iter += 1
+                self.historical_train_losses.append([iter, batch_train_loss])
 
                 if (iter + 1) % validation_frequency == 0:
-
-                    # compute zero-one loss on validation set
-                    validation_losses = [self.validate_model(i) for i
-                                         in xrange(self.n_valid_batches)]
-                    this_validation_loss = numpy.mean(validation_losses)
-                    self.historical_val_losses.append([iter, this_validation_loss])
+                    print 'training @ iter = %i. Cur training error is %f %%' % (iter, 100*batch_train_loss)
+                    this_valid_loss, this_kappa = self.validate()
+                    self.historical_val_losses.append([iter, this_valid_loss])
+                    self.historical_val_kappas.append([iter, this_kappa])
+                    mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(iter*60.)
                     print('     epoch %i, minibatch %i/%i, validation error %f %%' %
-                          (epoch, minibatch_index + 1, self.n_train_batches,
-                           this_validation_loss * 100.))
-                    if custom_loss:
-                        predictions = numpy.argmax(self.valid_outputs(), axis=1)
-                        this_custom_loss = custom_loss(predictions)
-                        self.historical_val_custom_losses.append([iter, this_custom_loss])
-                        print('     custom validation loss is: %f' % this_custom_loss)
-                    mins_per_epoch = (time.clock() - start_time)/(epoch*60.)
+                          (epoch, iter + 1 % self.n_train_batches, self.n_train_batches,
+                           this_valid_loss * 100.))
+                    print('     kappa on validation set is: %f' % this_kappa)
                     print('     averaging %f mins per epoch' % mins_per_epoch)
-
-                    # if we got the best validation score until now
-                    if this_validation_loss < best_validation_loss:
-
-                        #improve patience if loss improvement is good enough
-                        if this_validation_loss < best_validation_loss *  \
-                           improvement_threshold:
-                            patience = max(patience, iter * patience_increase)
-
-                        # save best validation score and iteration number
-                        best_validation_loss = this_validation_loss
-                        best_iter = iter
-
-                        # test it on the test set
-                        test_losses = [
-                            self.test_model(i)
-                            for i in xrange(self.n_test_batches)
-                        ]
-                        test_score = numpy.mean(test_losses)
-                        print(('          epoch %i, minibatch %i/%i, test error of '
-                               'best model %f %%') %
-                              (epoch, minibatch_index + 1, self.n_train_batches,
-                               test_score * 100.))
-
-                if patience <= iter:
-                    done_looping = True
-                    break
-
-        end_time = time.clock()
-        print('Optimization complete.')
-        print('Best validation score of %f %% obtained at iteration %i, '
-              'with test performance %f %%' %
-              (best_validation_loss * 100., best_iter + 1, test_score * 100.))
-        print >> sys.stderr, ('The code for file ' +
-                              os.path.split(__file__)[1] +
-                              ' ran for %.2fm' % ((end_time - start_time) / 60.))
-
-def kappa_function(dataset, y_index):
-    ys = load_data(dataset, y_values_only=True)
-    y_true_full = ys[y_index]
-    def kappa(y_pred):
-        y_true = y_true_full[:len(y_pred)]
-        k, M = QWK(y_true, y_pred)
-        print_confusion_matrix(M)
-        return k
-    return kappa
 
 def save_results(filename, params):
     name = filename or 'CNN_%iParams_t%i' % (len(self.params) / 2, int(time.time()))
@@ -323,7 +197,7 @@ def save_results(filename, params):
     cPickle.dump(params, f, -1)
     f.close()
 
-def train_vggnet(network, init_learning_rate, n_epochs, dataset,
+def train_drnet(network, learning_rate, momentum, n_epochs, dataset,
                  batch_size, cuda_convnet, leakiness, partial_sum, center, normalize):
     """
     :type learning_rate: float
@@ -349,25 +223,24 @@ def train_vggnet(network, init_learning_rate, n_epochs, dataset,
         input_image_size = network['rec_input_size']
         digit_normalized_width = int(input_image_size * 0.9) # only relevant if mnist
 
-    input_image_channels = 1 if dataset == 'data/mnist.pkl.gz' else 3
-    output_classes = 10 if dataset == 'data/mnist.pkl.gz' else 5
+    input_image_channels = 3
+    output_classes = 1
 
-    kappa = kappa_function(dataset, 1) # validation
-    image_shape = [input_image_size, input_image_size, input_image_channels] # only relevant if mean is subtracted
-    model_spec = [[input_image_size, input_image_channels]] + netspec + [[1, output_classes]]
+    image_shape = (input_image_size, input_image_size, input_image_channels)
+    model_spec = [[input_image_size, input_image_channels]] + netspec
 
-    datasets = load_data(dataset, digit_out_image_size=input_image_size, digit_normalized_width=digit_normalized_width, conserve_gpu_memory=True, center=center, normalize=normalize, image_shape=image_shape) # only relevant if mean is subtracted
+    data_stream = DataStream(image_shape=image_shape)
 
-    column = VGGNet(datasets, batch_size, cuda_convnet, leakiness, partial_sum, model_spec, pad=pad)
+    column = VGGNet(data_stream, batch_size, learning_rate, momentum, cuda_convnet, leakiness, partial_sum, model_spec, pad=pad)
     try:
-        column.train_column(init_learning_rate, n_epochs, kappa)
+        column.train_column(n_epochs)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     column.save(runid)
-    save_results(runid, [column.historical_costs, column.historical_val_losses, column.historical_val_custom_losses])
+    save_results(runid, [column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas])
 
 if __name__ == '__main__':
-    arg_names = ['command', 'network', 'dataset', 'batch_size', 'cuda_convnet', 'center', 'normalize', 'partial_sum', 'leakiness', 'init_learning_rate', 'n_epochs']
+    arg_names = ['command', 'network', 'dataset', 'batch_size', 'cuda_convnet', 'center', 'normalize', 'partial_sum', 'leakiness', 'learning_rate', 'n_epochs']
     arg = dict(zip(arg_names, sys.argv))
 
     network = arg.get('network') or 'vgg_mini6'
@@ -378,7 +251,8 @@ if __name__ == '__main__':
     normalize = int(arg.get('normalize') or 0)
     partial_sum = int(arg.get('partial_sum') or 0) or None # 0 turns into None. None or 1 work all the time (otherwise refer to pylearn2 docs)
     leakiness = float(arg.get('leakiness') or 0.01)
-    init_learning_rate = float(arg.get('init_learning_rate') or 0.001)
+    learning_rate = float(arg.get('learning_rate') or 0.01)
+    momentum = float(arg.get('momentum') or 0.9)
     n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
 
-    train_vggnet(network=network, init_learning_rate=init_learning_rate, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum, center=center, normalize=normalize)
+    train_drnet(network=network, learning_rate=learning_rate, momentum=momentum, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, cuda_convnet=cuda_convnet, leakiness=leakiness, partial_sum=partial_sum, center=center, normalize=normalize)
