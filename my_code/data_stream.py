@@ -27,7 +27,7 @@ class DataStream(object):
             self.calc_mean_std_image()
 
     def valid_set(self):
-        all_val_images = numpy.zeros(((len(self.valid_dataset),) + self.image_shape), dtype=numpy.float32)
+        all_val_images = numpy.zeros(((len(self.valid_dataset),) + self.image_shape), dtype=theano.config.floatX)
         for i, image in enumerate(self.valid_dataset):
             all_val_images[i, ...] = self.preprocess_image(imread(self.image_dir + image)) # b01c, Theano: bc01 CudaConvnet: c01b
         return numpy.rollaxis(all_val_images, 3, 1), numpy.array(self.valid_dataset.values(), dtype=numpy.int32)[numpy.newaxis].T
@@ -36,7 +36,7 @@ class DataStream(object):
         """
         Yields a x_cache_block, has a size that is a multiple of training batches
         """
-        x_cache_block = numpy.zeros(((self.cache_size,) + self.image_shape), dtype=numpy.float32)
+        x_cache_block = numpy.zeros(((self.cache_size,) + self.image_shape), dtype=theano.config.floatX)
         n_cache_blocks = int(len(self.train_dataset) / float(self.cache_size)) # rounding down skips the leftovers
         assert(n_cache_blocks)
         for ith_cache_block in xrange(n_cache_blocks):
@@ -47,7 +47,7 @@ class DataStream(object):
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(self.train_dataset.values()[ith_cache_block_slice], dtype=numpy.int32)[numpy.newaxis].T
 
     def preprocess_image(self, image):
-        image = image / 255.
+        # image = image / 255.
         if not self.mean == None:
             image = image - self.mean
         if not self.std == None:
@@ -59,8 +59,8 @@ class DataStream(object):
         Streaming variance calc: http://math.stackexchange.com/questions/20593/calculate-variance-from-a-stream-of-sample-values
         """
         print("Calculating mean and std dev image...")
-        mean = numpy.zeros(self.image_shape, dtype=numpy.float32)
-        mean_sqr = numpy.zeros(self.image_shape, dtype=numpy.float32)
+        mean = numpy.zeros(self.image_shape, dtype=theano.config.floatX)
+        mean_sqr = numpy.zeros(self.image_shape, dtype=theano.config.floatX)
         N = len(self.train_dataset)
         for image in self.train_dataset.keys():
             img = imread(self.image_dir + image) / 255.

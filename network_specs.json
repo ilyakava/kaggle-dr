@@ -12,7 +12,7 @@
         ],
         "trials": [
             "kappa stuck at 0 for center+normalized using cuda convnet after 12 epochs",
-            "trying no center+normalized with cuda convnet, is fine, conf matrix splits up"
+            "trying no center+normalized with cuda convnet, is fine, conf matrix splits up. Something is up when the input values are very small, very strange."
         ]
     },
     "vgg_mini6d" : {
