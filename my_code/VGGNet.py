@@ -15,8 +15,9 @@ import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 import lasagne
-from lasagne import layers
+from lasagne import layers, nonlinearities
 import lasagne.layers.cuda_convnet
+from lasagne.nonlinearities import LeakyRectify
 # git submodules
 from ciresan.code.ciresan2012 import Ciresan2012Column
 # this repo
@@ -45,7 +46,7 @@ class VGGNet(Ciresan2012Column):
         valid_x = theano.shared(lasagne.utils.floatX(valid_x))
         self.valid_y = theano.shared(self.valid_y)
         # build model
-        all_layers = self.build_model(model_spec, pad)
+        all_layers = self.build_model(model_spec, leakiness, pad)
 
         cache_block_index = T.iscalar('cache_block_index')
         X_batch = T.tensor4('x')
@@ -83,47 +84,70 @@ class VGGNet(Ciresan2012Column):
 
     def precompute_layer_sizes(self, model_spec, pad):
         layer_input_sizes = numpy.ones(len(model_spec), dtype=int)
-        layer_input_sizes[0] = model_spec[0][0]
+        layer_input_sizes[0] = model_spec[0]["size"]
         layer_input_sizes[1] = layer_input_sizes[0]
         for i in xrange(2,len(model_spec)):
-            downsample = model_spec[i-1][2] if (len(model_spec[i-1]) >= 3) else 1
-            if (len(model_spec[i-1]) >= 3) or (i == 1):
+            downsample = (model_spec[i-1].get("pool_stride") or 1) if (model_spec[i-1]["type"] == "CONV") else 1
+            if (model_spec[i-1]["type"] == "CONV") or (i == 1):
                 # int division will automatically round down to match ignore_border=T
                 # in theano.tensor.signal.downsample.max_pool_2d
                 if pad:
-                    assert(model_spec[i-1][0] - 2*pad == 1) # must be able to handle edge pixels (plus no even conv filters allowed)
+                    assert(model_spec[i-1]["filter_size"] - 2*pad == 1) # must be able to handle edge pixels (plus no even conv filters allowed)
                     # additive = 0 if (cuda_convnet and (len(model_spec[i]) >= 3)) else 2 # can't remember what this has to do with (maybe it is with odd sizes? will discover later)
                     additive = 0 if cuda_convnet else 2
                     layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
                 else: #(prev_size - cur_conv / maxpool degree)
-                    layer_input_sizes[i] = ((layer_input_sizes[i-1] - model_spec[i-1][0]) / downsample) + 1
-        layer_parameter_counts = [0] + [model_spec[i - 1][1]*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
+                    layer_input_sizes[i] = ((layer_input_sizes[i-1] - model_spec[i-1]["filter_size"]) / downsample) + 1
+        width = model_spec[i - 1]["num_filters"] if model_spec[i-1]["type"] == "CONV" else model_spec[i - 1]["num_units"]
+        layer_parameter_counts = [0] + [width*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
         return [layer_input_sizes, layer_parameter_counts]
 
-    def build_model(self, model_spec, pad):
+    def build_model(self, model_spec, leakiness, pad):
         print("Building model from JSON...")
-        all_layers = [layers.InputLayer(shape=(None, model_spec[0][1], model_spec[0][0], model_spec[0][0]))]
+        lr = LeakyRectify(leakiness)
+        def get_nonlinearity(layer):
+            default_nonlinear = "ReLu"
+            req = layer.get("nonlinearity") or default_nonlinear
+            return {
+                "LReLu": lr,
+                "None": None,
+                "sigmoid": nonlinearities.sigmoid,
+                "ReLu": nonlinearities.rectify
+            }[req]
+        def get_init(layer):
+            default_init = "Normal"
+            req = layer.get("init") or default_init
+            return {
+                "Normal": lasagne.init.Normal(),
+                "Orthogonal": lasagne.init.Orthogonal(gain='relu')
+            }[req]
+
+        all_layers = [layers.InputLayer(shape=(None, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
-            if len(cs) >= 3: # CONV layer
+            if cs["type"] == "CONV":
                 border_mode = 'full' if pad else 'valid'
+                if cs.get("dropout"):
+                    all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
                 all_layers.append(layers.cuda_convnet.Conv2DCCLayer(all_layers[-1],
-                                    num_filters=cs[1],
-                                    filter_size=(cs[0], cs[0]),
+                                    num_filters=cs["num_filters"],
+                                    filter_size=(cs["filter_size"], cs["filter_size"]),
                                     border_mode=border_mode,
-                                    W=lasagne.init.Normal()))
-                all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1], (cs[-1], cs[-1])))
-            elif len(cs) == 2: # FC layer
+                                    W=get_init(cs),
+                                    nonlinearity=get_nonlinearity(cs)))
+                if cs.get("pool_size"):
+                    all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1],
+                                        pool_size=(cs["pool_size"], cs["pool_size"]),
+                                        stride=(cs["pool_stride"], cs["pool_stride"])))
+            elif cs["type"] == "FC":
+                if cs.get("dropout"):
+                    all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
                 all_layers.append((layers.DenseLayer(all_layers[-1],
-                                   num_units=cs[1],
-                                   W=lasagne.init.Normal())))
-                all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=0.5))
+                                   num_units=cs["num_units"],
+                                   W=get_init(cs),
+                                   nonlinearity=get_nonlinearity(cs))))
             else:
                 raise NotImplementedError()
-        # output layer
-        all_layers.append(layers.DenseLayer(all_layers[-1],
-                           num_units=1,
-                           nonlinearity=None))
         return all_layers
 
     def train_epoch(self):
@@ -204,7 +228,7 @@ def train_drnet(network, learning_rate, momentum, n_epochs, dataset,
     output_classes = 1
 
     image_shape = (input_image_size, input_image_size, input_image_channels)
-    model_spec = [[input_image_size, input_image_channels]] + netspec
+    model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
 
     data_stream = DataStream(image_dir=dataset, image_shape=image_shape, center=center, normalize=normalize)
 

@@ -1,14 +1,31 @@
-{   "vgg_mini7" : {
+{
+    "vgg_mini7b" : {
         "rec_input_size": 128,
         "pad": 0,
         "layers": [
-            [3,32,2],
-            [3,64,2],
-            [3,128,2],
-            [3,128,2],
-            [3,256,2],
-            [1,2048],
-            [1,2048]
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 4 }
+        ],
+        "trials": []
+    },
+    "vgg_mini7" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "num_units": 2048 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048 },
+            { "type": "FC", "dropout": 0.5, "num_units": 1, "nonlinearity": "None" }
         ],
         "trials": [
             "kappa stuck at 0 for center+normalized using cuda convnet after 12 epochs",
