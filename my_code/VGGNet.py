@@ -205,7 +205,7 @@ def train_drnet(network, learning_rate, momentum, n_epochs, dataset,
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [[input_image_size, input_image_channels]] + netspec
 
-    data_stream = DataStream(image_dir=dataset, image_shape=image_shape)
+    data_stream = DataStream(image_dir=dataset, image_shape=image_shape, center=center, normalize=normalize)
 
     column = VGGNet(data_stream, batch_size, learning_rate, momentum, leakiness, model_spec, pad=pad)
     try:
