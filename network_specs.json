@@ -10,7 +10,10 @@
             [1,2048],
             [1,2048]
         ],
-        "trials": []
+        "trials": [
+            "kappa stuck at 0 for center+normalized using cuda convnet after 12 epochs",
+            "trying no center+normalized with cuda convnet, is fine, conf matrix splits up"
+        ]
     },
     "vgg_mini6d" : {
         "rec_input_size": 112,

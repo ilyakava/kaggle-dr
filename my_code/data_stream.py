@@ -47,6 +47,7 @@ class DataStream(object):
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(self.train_dataset.values()[ith_cache_block_slice], dtype=numpy.int32)[numpy.newaxis].T
 
     def preprocess_image(self, image):
+        image = image / 255.
         if not self.mean == None:
             image = image - self.mean
         if not self.std == None:
@@ -62,7 +63,7 @@ class DataStream(object):
         mean_sqr = numpy.zeros(self.image_shape, dtype=numpy.float32)
         N = len(self.train_dataset)
         for image in self.train_dataset.keys():
-            img = imread(self.image_dir + image)
+            img = imread(self.image_dir + image) / 255.
             mean += img
             mean_sqr += numpy.square(img)
         self.mean = mean / N
