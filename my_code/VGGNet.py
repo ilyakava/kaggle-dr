@@ -16,6 +16,7 @@ from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 import lasagne
 from lasagne import layers
+import lasagne.layers.cuda_convnet
 # git submodules
 from ciresan.code.ciresan2012 import Ciresan2012Column
 # this repo
@@ -106,12 +107,12 @@ class VGGNet(Ciresan2012Column):
             cs = model_spec[i] # current spec
             if len(cs) >= 3: # CONV layer
                 border_mode = 'full' if pad else 'valid'
-                all_layers.append(layers.Conv2DLayer(all_layers[-1],
+                all_layers.append(layers.cuda_convnet.Conv2DCCLayer(all_layers[-1],
                                     num_filters=cs[1],
                                     filter_size=(cs[0], cs[0]),
                                     border_mode=border_mode,
                                     W=lasagne.init.Normal()))
-                all_layers.append(layers.MaxPool2DLayer(all_layers[-1], (cs[-1], cs[-1])))
+                all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1], (cs[-1], cs[-1])))
             elif len(cs) == 2: # FC layer
                 all_layers.append((layers.DenseLayer(all_layers[-1],
                                    num_units=cs[1],
