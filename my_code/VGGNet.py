@@ -34,8 +34,8 @@ class VGGNet(Ciresan2012Column):
         print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
         # data setup
         self.ds = data_stream
-        self.n_valid_batches = len(self.ds.valid_dataset) // batch_size
         self.n_train_batches = len(self.ds.train_dataset) // batch_size
+        self.n_valid_batches = len(self.ds.valid_dataset) // batch_size
         self.batches_per_cache_block = self.ds.cache_size // batch_size
 
         self.train_x, self.train_y = self.ds.train_buffer().next()
@@ -238,7 +238,7 @@ def train_drnet(network, learning_rate, momentum, n_epochs, dataset,
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     column.save(runid)
-    save_results(runid, [column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas])
+    save_results(runid, [column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches])
 
 if __name__ == '__main__':
     arg_names = ['command', 'network', 'dataset', 'batch_size', 'center', 'normalize', 'learning_rate', 'momentum', 'leakiness', 'n_epochs']
