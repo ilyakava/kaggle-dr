@@ -1,9 +1,14 @@
-## Getting Started
+# Getting Started
 
+## Code (tested on Ubuntu 14.10)
 
-### Clone Code from ciresan and theanet
+### Install for a new Machine
 
-`git submodule update --init --recursive`
+`sudo apt-get install -y git python-pip python-yaml python-numpy python-scipy python-matplotlib ipython ipython-notebook python-pandas python-sympy python-nose libfreetype6-dev libpng-dev`
+
+### Install General Python deps:
+
+`sudo pip install -U theano scikit-learn scikit-image`
 
 ### Install Lasange
 
@@ -14,13 +19,38 @@ pip install -r requirements.txt
 sudo python setup.py install
 ```
 
-### General Python deps:
+### Install pylearn2
 
-`pip install -U scikit-learn`
+```
+git clone git://github.com/lisa-lab/pylearn2.git && cd pylearn2/ && sudo python setup.py develop
+```
+
+#### Create a [~/.theanorc](http://deeplearning.net/software/theano/library/config.html) file
+
+Ex Contents:
+
+```
+[global]
+floatX = float32
+device = gpu0
+
+```
+
+[Override with another device via](http://deeplearning.net/software/theano/library/config.html): `THEANO_FLAGS='device=gpu0'` prefix. Get a list of gpus via: `nvidia-smi -L`.
+
+### Clone Code from ciresan and theanet
+
+`git submodule update --init --recursive`
+
+## Data
+
+### Install
+
+`sudo apt-get install -y p7zip-full graphicsmagick`
 
 ### Download & Unpack Data
 
-Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/data?trainLabels.csv.zip), run to unpack:
+Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/data?trainLabels.csv.zip) (maybe with w3m), run to unpack:
 
 `7z x train.zip.001`
 
@@ -32,24 +62,18 @@ Place `trainLabels.csv` into `data/`
 
 #### Full Size Originals -> Smaller Originals (~2 hours)
 
-requires graphicsmagick
-
 Ex:
 
 ```
 mkdir data/train/128_simple
-python data/create_resize_batchfiles.py data/train/orig/ data/train/128_simple/ 1 128
+python data/create_resize_batchfiles.py data/train/orig/ data/train/128_simple/ 2 128
 ```
 
 #### Standardization
 
 ... Coming soon
 
-#### Packaging for Network (~8 minutes)
-
-```
-python -m my_code.create_train_val_test_set
-```
+## The Network
 
 ### Training the network
 
