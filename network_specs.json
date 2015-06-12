@@ -1,20 +1,45 @@
 {
-    "vgg_mini7b" : {
-        "rec_input_size": 128,
+    "ciresan" : {
+        "rec_input_size": 29,
         "pad": 0,
         "layers": [
-            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3 },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
-            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
-            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
-            { "type": "FC", "dropout": 0.5, "num_units": 4 }
+            { "type": "CONV", "num_filters": 32, "filter_size": 4, "pool_size": 2, "pool_stride": 2, "nonlinearity": "tanh" },
+            { "type": "CONV", "num_filters": 48, "filter_size": 5, "pool_size": 3, "pool_stride": 3, "nonlinearity": "tanh" },
+            { "type": "FC", "num_units": 150, "nonlinearity": "tanh" },
+            { "type": "OUTPUT", "nonlinearity": "softmax" }
+        ],
+        "trials": []
+    },
+    "lasagne_mnist" : {
+        "rec_input_size": 28,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 5, "pool_size": 2, "pool_stride": 2, "nonlinearity": "ReLU" },
+            { "type": "CONV", "num_filters": 32, "filter_size": 5, "pool_size": 2, "pool_stride": 2, "nonlinearity": "ReLU" },
+            { "type": "FC", "num_units": 256, "nonlinearity": "ReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax"}
         ],
         "trials": []
     },
     "vgg_mini7" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Normal" },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Normal" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Normal" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Normal" },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Normal" },
+            { "type": "FC", "num_units": 2048, "init": "Normal" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "init": "Normal" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "alias": "vgg_mini7iN",
+        "trials": [
+            "K=0 after 22 epochs for digits 128"
+        ]
+    },
+    "vgg_mini7b2" : {
         "rec_input_size": 128,
         "pad": 0,
         "layers": [
@@ -25,12 +50,61 @@
             { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
             { "type": "FC", "num_units": 2048 },
             { "type": "FC", "dropout": 0.5, "num_units": 2048 },
-            { "type": "FC", "dropout": 0.5, "num_units": 1, "nonlinearity": "None" }
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
         ],
+        "alias": "vgg_mini7iG",
+        "desc": "vgg_mini7 without the normal initialization, still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling, CONV dropout)",
+        "trials": []
+    },
+    "vgg_mini7iO" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "FC", "num_units": 2048, "init": "Orthogonal" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "init": "Orthogonal" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini7 with XXX init instead of normal. still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling, CONV dropout)",
+        "trials": []
+    },
+    "vgg_mini7b" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "alias": "vgg_mini7iG_OC_FCP_CD",
+        "desc": "Takes vgg_mini7 and removes normal init, and adds 3 overfitting measures (overlapping CONV, FC pooling, CONV dropout)",
         "trials": [
-            "kappa stuck at 0 for center+normalized using cuda convnet after 12 epochs",
-            "trying no center+normalized with cuda convnet, is fine, conf matrix splits up. Something is up when the input values are very small, very strange."
+            "Great, K~=1 after 12 epochs on Digits. 5.8 mins/epoch"
         ]
+    },
+    "vgg_mini7c" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "FC", "num_units": 2048, "nonlinearity": "None", "init": "Normal", "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "nonlinearity": "None", "init": "Normal", "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 1, "nonlinearity": "softmax" }
+        ],
+        "trials": []
     },
     "vgg_mini6d" : {
         "rec_input_size": 112,

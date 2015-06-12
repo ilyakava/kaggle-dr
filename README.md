@@ -56,7 +56,7 @@ Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/d
 
 Place these images into `data/train/orig`
 
-Place `trainLabels.csv` into `data/`
+Place `trainLabels.csv` into `data/train`
 
 ### Preparing Data for the Network
 
@@ -65,8 +65,8 @@ Place `trainLabels.csv` into `data/`
 Ex:
 
 ```
-mkdir data/train/128_simple
-python data/create_resize_batchfiles.py data/train/orig/ data/train/128_simple/ 2 128
+mkdir data/train/centered_crop
+python data/create_resize_batchfiles.py data/train/orig/ data/train/centered_crop/ 2 128
 ```
 
 #### Standardization

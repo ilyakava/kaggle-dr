@@ -5,12 +5,13 @@ import numpy
 
 import pdb
 
-K = 5 # num classes
-
-def create_train_val_test_set(label_csv, valid_set_size, test_set_size, extension=".jpeg"):
+def create_train_val_test_set(label_csv, valid_set_size, test_set_size, extension=".jpeg", K=5):
     # create set of int ids
     id_to_y = {} # just a reference
-    y_to_id = {0:[], 1:[], 2:[], 3:[], 4:[]} # acts as our pool
+    y_to_id = {} # acts as our pool
+    for k in xrange(K):
+        y_to_id[k] = []
+
     with open(label_csv, 'rb') as csvfile:
         reader = csv.reader(csvfile)
         next(reader, None)

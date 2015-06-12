@@ -3,22 +3,33 @@ from sklearn.metrics import confusion_matrix
 
 import pdb
 
-K = 5 # num classes
+class UnsupportedPredictedClasses(Exception):
+    def __init__(self, message, errors):
+        # Call the base class constructor with the parameters it needs
+        super(UnsupportedPredictedClasses, self).__init__(message)
+
+def assert_valid_prediction(y_pred, K):
+    forbidden_klasses = set(y_pred.flatten()) - set(list(range(K)))
+    if len(forbidden_klasses):
+        err = "Unsupported Predicted Classes: {}".format(forbidden_klasses)
+        print(err)
+        raise UnsupportedPredictedClasses()
 
 def print_confusion_matrix(M):
     print("Confusion Matrix")
     print("T\P|    0 |    1 |    2 |    3 |    4 |")
     print("---|------|------|------|------|------|")
-    for i, y in enumerate(xrange(K)):
+    for i, y in enumerate(xrange(5)):
         print(" %d | %4d | %4d | %4d | %4d | %4d |" % ((y, ) + tuple(M[i])))
         print("---|------|------|------|------|------|")
 
-def QWK(y_true, y_pred):
+def QWK(y_true, y_pred, K=5):
     """
     Quadratic mean weighted kappa
     Taken from Matlab code: https://github.com/benhamner/ASAP-AES/blob/master/Evaluation_Metrics/Matlab-Octave/scoreQuadraticWeightedKappa.m
     That was referenced from Admin in Kaggle forums: https://www.kaggle.com/c/asap-aes/forums/t/1289/scoring-metric-verification
     """
+    assert_valid_prediction(y_pred, K)
     M = confusion_matrix(y_true, y_pred, labels=list(range(K)))
     dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
     dy = dx.transpose()
