@@ -53,7 +53,7 @@
             { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
         ],
         "alias": "vgg_mini7iG",
-        "desc": "vgg_mini7 without the normal initialization, still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling, CONV dropout)",
+        "desc": "vgg_mini7 with GlorotUniform init instead of normal., still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling, CONV dropout)",
         "trials": []
     },
     "vgg_mini7iO" : {
@@ -69,7 +69,115 @@
             { "type": "FC", "dropout": 0.5, "num_units": 2048, "init": "Orthogonal" },
             { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
         ],
-        "desc": "vgg_mini7 with XXX init instead of normal. still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling, CONV dropout)",
+        "desc": "vgg_mini7 with Orthogonal init instead of normal. still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling, CONV dropout)",
+        "trials": []
+    },
+    "vgg_mini7iO_CD" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "FC", "num_units": 2048, "init": "Orthogonal" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "init": "Orthogonal" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini7 with Orthogonal init instead of normal plus CONV dropout. still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling)",
+        "trials": []
+    },
+    "vgg_mini7iG_CD" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "num_units": 2048 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini7 with GlorotUniform init instead of normal plus CONV dropout. still missing a few things from vgg_mini7b (overlapping CONV pooling, FC pooling)",
+        "trials": []
+    },
+    "vgg_mini7iO_CD_FP" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "FC", "num_units": 2048, "init": "Orthogonal", "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "init": "Orthogonal", "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "trials": []
+    },
+    "vgg_mini7iO_FP" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "init": "Orthogonal" },
+            { "type": "FC", "num_units": 2048, "init": "Orthogonal", "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "init": "Orthogonal", "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "trials": []
+    },
+    "vgg_mini7iG_CD_FP" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "trials": []
+    },
+    "vgg_mini7iG_FP" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "trials": []
+    },
+    "vgg_mini7+iG_CD_FP" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "Just adds an additional FC dropout over vgg_mini7iG_CD_FP",
         "trials": []
     },
     "vgg_mini7b" : {
@@ -86,10 +194,59 @@
             { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
         ],
         "alias": "vgg_mini7iG_OC_FCP_CD",
-        "desc": "Takes vgg_mini7 and removes normal init, and adds 3 overfitting measures (overlapping CONV, FC pooling, CONV dropout)",
+        "desc": "vgg_mini7+iG_CD_FP with overlappping pooling in Conv layers",
         "trials": [
             "Great, K~=1 after 12 epochs on Digits. 5.8 mins/epoch"
         ]
+    },
+    "vgg_mini7b_sig" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b with sigmoid on output layer",
+        "trials": []
+    },
+    "vgg_mini7b_leak" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini7+iG_CD_FP with overlappping pooling in Conv layers",
+        "trials": []
+    },
+    "vgg_mini7b_doub" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 3, "pool_stride": 2 },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 512, "filter_size": 3, "pool_size": 2, "pool_stride": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2 },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "alias": "vgg_mini7iG_OC_FCP_CD",
+        "desc": "Twice as fat as vgg_mini7b",
+        "trials": []
     },
     "vgg_mini7c" : {
         "rec_input_size": 128,

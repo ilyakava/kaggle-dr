@@ -8,7 +8,7 @@
 
 ### Install General Python deps:
 
-`sudo pip install -U theano scikit-learn scikit-image`
+`sudo pip install theano scikit-learn scikit-image`
 
 ### Install Lasange
 

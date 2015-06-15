@@ -27,8 +27,8 @@ from my_code.data_stream import DataStream
 import pdb
 
 class VGGNet(Ciresan2012Column):
-    def __init__(self, data_stream, batch_size, learning_rate, momentum, leakiness, model_spec, num_output_classes, pad=1, params=None):
-        self.column_params = [batch_size, learning_rate, momentum, leakiness, model_spec, pad]
+    def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, num_output_classes, pad=1, params=None):
+        self.column_params = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, pad]
         layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad)
         print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
         print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
@@ -38,6 +38,8 @@ class VGGNet(Ciresan2012Column):
         self.n_valid_batches = len(self.ds.valid_dataset) // batch_size
         self.batches_per_cache_block = self.ds.cache_size // batch_size
         self.num_output_classes = num_output_classes
+        self.learning_rate = init_learning_rate
+        self.learning_rate_decayed_epochs = []
 
         self.train_x, self.train_y = self.ds.train_buffer().next()
         self.train_x = theano.shared(lasagne.utils.floatX(self.train_x))
@@ -47,8 +49,9 @@ class VGGNet(Ciresan2012Column):
         valid_x = theano.shared(lasagne.utils.floatX(valid_x))
         self.valid_y = T.cast(theano.shared(self.valid_y), 'int32')
 
-        all_layers = self.build_model(model_spec, leakiness, pad)
+        all_layers = self.build_model(model_spec, leak_alpha, pad)
 
+        learning_rate = T.fscalar()
         cache_block_index = T.iscalar('cache_block_index')
         X_batch = T.tensor4('x')
         y_batch = T.ivector('y')
@@ -65,7 +68,7 @@ class VGGNet(Ciresan2012Column):
         print("Compiling...")
 
         self.train_batch = theano.function(
-            [cache_block_index], loss_train,
+            [cache_block_index, learning_rate], loss_train,
             updates=updates,
             givens={
                 X_batch: self.train_x[batch_slice],
@@ -108,14 +111,13 @@ class VGGNet(Ciresan2012Column):
             raise ValueError("unsupported output shape %i" % self.num_output_classes)
         return objective, pred
 
-    def build_model(self, model_spec, leakiness, pad):
+    def build_model(self, model_spec, leak_alpha, pad):
         print("Building model from JSON...")
-        lr = LeakyRectify(leakiness)
         def get_nonlinearity(layer):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
             req = layer.get("nonlinearity") or default_nonlinear
             return {
-                "LReLU": lr,
+                "LReLU": LeakyRectify(1./leak_alpha),
                 "None": None,
                 "sigmoid": nonlinearities.sigmoid,
                 "ReLU": nonlinearities.rectify,
@@ -178,10 +180,22 @@ class VGGNet(Ciresan2012Column):
             self.train_y.set_value(y_cache_block, borrow=True)
 
             for i in xrange(self.batches_per_cache_block):
-                batch_loss = self.train_batch(i)
+                batch_loss = self.train_batch(i, self.learning_rate)
+                self.historical_train_losses.append([self.iter, batch_loss])
                 yield batch_loss
 
-    def validate(self, silent=False):
+    def decay_learning_rate(self, patience, factor, limit=2):
+        if (len(self.learning_rate_decayed_epochs) < limit and
+            max([0] + self.learning_rate_decayed_epochs) + patience < self.epoch): # also skip first 4 epochs
+
+            val_losses = numpy.array(self.historical_val_losses)
+            best_val_loss = min(val_losses[:,1])
+            last_val_losses = val_losses[-patience:,1]
+            if sum(last_val_losses > best_val_loss) == patience:
+                self.learning_rate_decayed_epochs.append(self.epoch)
+                self.learning_rate = self.learning_rate / factor
+
+    def validate(self, decay_patience, decay_factor, silent=False):
         """
         Iterates through validation minibatches
         """
@@ -192,50 +206,52 @@ class VGGNet(Ciresan2012Column):
             batch_valid_losses.append(batch_valid_loss)
             valid_predictions.extend(prediction)
         [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions), self.num_output_classes)
+        val_loss = numpy.mean(batch_valid_losses)
+        self.decay_learning_rate(decay_patience, decay_factor)
+        # housekeeping
+        self.historical_val_losses.append([self.iter, val_loss])
+        self.historical_val_kappas.append([self.iter, kappa])
+        print('     epoch %i, minibatch %i/%i, validation error %f %%' %
+                          (self.epoch, self.iter + 1 % self.n_train_batches, self.n_train_batches,
+                           val_loss * 100.))
+        print('     kappa on validation set is: %f' % kappa)
         if not silent and (self.num_output_classes == 5):
             print_confusion_matrix(M)
-        val_loss = numpy.mean(batch_valid_losses)
         return [val_loss, kappa]
 
-    def train_column(self, n_epochs):
-        validations_per_epoch = 1
+    def train_column(self, max_epochs, decay_patience, decay_factor, validations_per_epoch=1):
         print("Training...")
         start_time = time.clock()
-        epoch = 0
         batch_multiple_to_validate = self.n_train_batches // validations_per_epoch
-        iter = 0
+        # reset training state of column
+        self.epoch = 0
+        self.iter = 0
         self.historical_train_losses = []
         self.historical_val_losses = []
         self.historical_val_kappas = []
-        while epoch < n_epochs:
-            epoch += 1
+        while self.epoch < max_epochs:
+            self.epoch += 1
             for batch_train_loss in self.train_epoch():
-                iter += 1
-                self.historical_train_losses.append([iter, batch_train_loss])
-
-                if (iter + 1) % batch_multiple_to_validate == 0:
-                    mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(iter*60.)
+                self.iter += 1
+                if (self.iter + 1) % batch_multiple_to_validate == 0:
+                    mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(self.iter*60.)
                     print('training @ iter = %i @ %.1fm (ETA %.1fm). Cur training error is %f %%' %
-                        (iter, ((time.clock() - start_time )/60.), mins_per_epoch*(n_epochs-epoch-1), 100*batch_train_loss))
-                    this_valid_loss, this_kappa = self.validate()
-                    self.historical_val_losses.append([iter, this_valid_loss])
-                    self.historical_val_kappas.append([iter, this_kappa])
-                    print('     epoch %i, minibatch %i/%i, validation error %f %%' %
-                          (epoch, iter + 1 % self.n_train_batches, self.n_train_batches,
-                           this_valid_loss * 100.))
-                    print('     kappa on validation set is: %f' % this_kappa)
+                        (self.iter, ((time.clock() - start_time )/60.), mins_per_epoch*(max_epochs-self.epoch), 100*batch_train_loss))
+                    self.validate(decay_patience, decay_factor)
                     print('     averaging %f mins per epoch' % mins_per_epoch)
 
-def save_results(filename, params):
+def save_results(filename, multi_params):
     name = filename or 'CNN_%iParams_t%i' % (len(self.params) / 2, int(time.time()))
     print('Saving Results as "%s"...' % name)
     f = open('./results/'+name+'.pkl', 'wb')
-    cPickle.dump(params, f, -1)
+    for params in multi_params:
+        cPickle.dump(params, f, -1)
     f.close()
 
-def train_drnet(network, learning_rate, momentum, n_epochs, dataset,
-                 batch_size, leakiness, center, normalize, amplify, as_grey, num_output_classes):
-    runid = "%s-%s-nu%f-cent%i-norm%i-amp%i-grey%i-out%i" % (str(uuid.uuid4())[:8], network, learning_rate, center, normalize, amplify, int(as_grey), num_output_classes)
+def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
+                 batch_size, leak_alpha, center, normalize, amplify,
+                 as_grey, num_output_classes, decay_patience, decay_factor):
+    runid = "%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
     with open('network_specs.json') as data_file:
@@ -251,31 +267,33 @@ def train_drnet(network, learning_rate, momentum, n_epochs, dataset,
 
     data_stream = DataStream(image_dir=dataset, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, num_output_classes=num_output_classes)
 
-    column = VGGNet(data_stream, batch_size, learning_rate, momentum, leakiness, model_spec, num_output_classes=num_output_classes, pad=pad)
+    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, num_output_classes=num_output_classes, pad=pad)
     try:
-        column.train_column(n_epochs)
+        column.train_column(max_epochs, decay_patience, decay_factor)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     except UnsupportedPredictedClasses:
         print "[ERROR] UnsupportedPredictedClasses, saving results"
     column.save(runid)
-    save_results(runid, [column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches])
+    save_results(runid, [[column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches], [column.learning_rate_decayed_epochs]])
 
 if __name__ == '__main__':
-    arg_names = ['command', 'network', 'dataset', 'batch_size', 'center', 'normalize', 'learning_rate', 'momentum', 'leakiness', 'n_epochs', 'amplify', 'as_grey', 'num_output_classes']
+    arg_names = ['command', 'network', 'dataset', 'batch_size', 'center', 'normalize', 'init_learning_rate', 'momentum', 'leak_alpha', 'max_epochs', 'amplify', 'as_grey', 'num_output_classes', 'decay_patience', 'decay_factor']
     arg = dict(zip(arg_names, sys.argv))
 
-    network = arg.get('network') or 'vgg_mini6'
+    network = arg.get('network') or 'vgg_mini7b'
     dataset = arg.get('dataset') or "data/train/centered_crop/" # data/train_digit/128/ alternative
-    batch_size = int(arg.get('batch_size') or 2)
+    batch_size = int(arg.get('batch_size') or 128)
     center = int(arg.get('center') or 0)
     normalize = int(arg.get('normalize') or 0)
-    learning_rate = float(arg.get('learning_rate') or 0.01)
+    init_learning_rate = float(arg.get('init_learning_rate') or 0.01)
     momentum = float(arg.get('momentum') or 0.9)
-    leakiness = float(arg.get('leakiness') or 0.01)
-    n_epochs = int(arg.get('n_epochs') or 800) # useful to change to 1 for a quick test run
+    leak_alpha = int(arg.get('leak_alpha') or 100)
+    max_epochs = int(arg.get('max_epochs') or 100) # useful to change to 1 for a quick test run
     amplify = int(arg.get('amplify') or 1)
     as_grey = bool(arg.get('as_grey') or 0)
     num_output_classes = int(arg.get('num_output_classes') or 5)
+    decay_patience = int(arg.get('decay_patience') or 5) # set to max_epochs to avoid decay
+    decay_factor = int(arg.get('decay_factor') or 10)
 
-    train_drnet(network=network, learning_rate=learning_rate, momentum=momentum, n_epochs=n_epochs, dataset=dataset, batch_size=batch_size, leakiness=leakiness, center=center, normalize=normalize, amplify=amplify, as_grey=as_grey, num_output_classes=num_output_classes)
+    train_drnet(network=network, init_learning_rate=init_learning_rate, momentum=momentum, max_epochs=max_epochs, dataset=dataset, batch_size=batch_size, leak_alpha=leak_alpha, center=center, normalize=normalize, amplify=amplify, as_grey=as_grey, num_output_classes=num_output_classes, decay_patience=decay_patience, decay_factor=decay_factor)

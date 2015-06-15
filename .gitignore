@@ -6,3 +6,4 @@ data/*
 
 *.npz
 *.pkl
+*.png
