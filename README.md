@@ -78,3 +78,13 @@ python data/create_resize_batchfiles.py data/train/orig/ data/train/centered_cro
 ### Training the network
 
 `python -m my_code.VGGNet`
+
+# Running tests
+
+`make test`
+
+# Getting Help
+
+- [SO](http://stackoverflow.com/questions/tagged/neural-network)
+- [DataScience Beta](http://datascience.stackexchange.com/questions/tagged/deep-learning)
+- [CrossValidated](http://stats.stackexchange.com/questions/tagged/deep-learning)

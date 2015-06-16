@@ -6,15 +6,14 @@ import matplotlib.pyplot as plt
 import pdb
 
 def plot_results(result_file):
-    num_dumps_in_file = 0
-    test_file = open(result_file)
-    while len(test_file.read()):
-        num_dumps_in_file += 1
-
     f = open(result_file)
     historical_train_losses, historical_val_losses, historical_val_kappas, n_iter_per_epoch = cPickle.load(f)
     n_iter_per_epoch = float(n_iter_per_epoch)
-    learn_rate_reduced_epochs = cPickle.load(f) if num_dumps_in_file == 2 else []
+    try:
+        learn_rate_reduced_epochs = cPickle.load(f)
+    except EOFError:
+        learn_rate_reduced_epochs = [[]] # looks like if there is only 1 thing loaded, it unpacks as an array
+    learn_rate_reduced_epochs = learn_rate_reduced_epochs[0]
 
     train = numpy.array(historical_train_losses)
     valid = numpy.array(historical_val_losses)
@@ -30,15 +29,30 @@ def plot_results(result_file):
         plt.axvspan(first_nan, last_nan, facecolor='r', alpha=0.5)
         plt.text(first_nan - 7, -0.5, "nan Zone ->", color='r', size=18)
 
-    plt.plot(train[:,0], train[:,1], 'g', label="Training error")
-    plt.plot(valid[:,0], valid[:,1], 'r', label="Validation error")
+    plt.plot(train[:,0], train[:,1], 'g', label="Training Loss")
+    plt.plot(valid[:,0], valid[:,1], 'r', label="Validation Loss")
     plt.plot(kappa[:,0], kappa[:,1], 'b', label="Validation Kappa")
-    plt.xlabel("Epoch")
-    plt.ylabel("Best Val MSE: %.3f and Kappa: %.3f" % (min(valid[:,1]), max(kappa[:,1])))
-    plt.axhline(y=min(valid[:,1]), color='r', ls='dashed')
-    plt.axhline(y=max(kappa[:,1]), color='b', ls='dashed')
+    plt.xlabel("Epochs. Decays at: {}".format(learn_rate_reduced_epochs))
+
+    best_valy_idx, best_valy = min(enumerate(valid[:,1]), key=lambda p: p[1])
+    best_valx = valid[best_valy_idx, 0]
+
+    best_kapy_idx, best_kapy = max(enumerate(kappa[:,1]), key=lambda p: p[1])
+    best_kapx = kappa[best_kapy_idx, 0]
+
+    plt.ylabel("Best Val: %.3f (%.0f) and Kappa: %.3f (%.0f)" % (best_valy, best_valx, best_kapy, best_kapx))
+
+    plt.axhline(y=best_valy, color='r', ls='dashed')
+    best_val_marker = plt.Circle((best_valx,best_valy),1,color='r',fill=False, clip_on=False)
+
+    plt.axhline(y=best_kapy, color='b', ls='dashed')
+    best_kap_marker = plt.Circle((best_kapx,best_kapy),1,color='b',fill=False, clip_on=False)
+
+    plt.scatter([best_valx], [best_valy], color='r', s=500,zorder=21,alpha=0.5)
+    plt.scatter([best_kapx], [best_kapy], color='b', s=500,zorder=20,alpha=0.5)
+
     for epoch in learn_rate_reduced_epochs:
-        plt.axhline(x=epoch, color='r')
+        plt.axvline(x=epoch, color='g')
     plt.title(result_file)
     plt.ylim((-1,1.5))
     plt.xlim((0,len(train[:,1]) / n_iter_per_epoch))

@@ -231,6 +231,59 @@
         "desc": "vgg_mini7+iG_CD_FP with overlappping pooling in Conv layers",
         "trials": []
     },
+    "vgg_mini8" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini7b_leak with an extra conv layer",
+        "trials": []
+    },
+    "vgg_mini10" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini8 with an extra conv layer. Numbering jump b/c I just realized the network should count the output layer in its 'N weight layers'",
+        "trials": []
+    },
+    "vgg_mini10_ld" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini10 without dropout on conv layers",
+        "trials": []
+    },
     "vgg_mini7b_doub" : {
         "rec_input_size": 128,
         "pad": 0,

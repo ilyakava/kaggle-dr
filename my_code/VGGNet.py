@@ -21,21 +21,21 @@ from lasagne.nonlinearities import LeakyRectify
 # git submodules
 from ciresan.code.ciresan2012 import Ciresan2012Column
 # this repo
-from my_code.util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
+from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
 
 import pdb
 
 class VGGNet(Ciresan2012Column):
-    def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, num_output_classes, pad=1, params=None):
+    def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad=1, params=None):
         self.column_params = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, pad]
         layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad)
         print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
         print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
         # data setup
         self.ds = data_stream
-        self.n_train_batches = len(self.ds.train_dataset) // batch_size
-        self.n_valid_batches = len(self.ds.valid_dataset) // batch_size
+        self.n_train_batches = self.ds.train_dataset_size // batch_size
+        self.n_valid_batches = self.ds.valid_dataset_size // batch_size
         self.batches_per_cache_block = self.ds.cache_size // batch_size
         self.num_output_classes = num_output_classes
         self.learning_rate = init_learning_rate
@@ -48,7 +48,7 @@ class VGGNet(Ciresan2012Column):
         valid_x, self.valid_y = self.ds.valid_set()
         valid_x = theano.shared(lasagne.utils.floatX(valid_x))
         self.valid_y = T.cast(theano.shared(self.valid_y), 'int32')
-
+        # network setup
         all_layers = self.build_model(model_spec, leak_alpha, pad)
 
         learning_rate = T.fscalar()
@@ -58,9 +58,7 @@ class VGGNet(Ciresan2012Column):
         batch_slice = slice(cache_block_index * batch_size,
                             (cache_block_index + 1) * batch_size)
 
-        objective, pred = self.build_objective_predictions(X_batch, all_layers[-1])
-        loss_train = objective.get_loss(X_batch, target=y_batch)
-        loss_valid = objective.get_loss(X_batch, target=y_batch, deterministic=True)
+        loss_train, loss_valid, pred = self.build_loss_predictions(X_batch, y_batch, all_layers[-1], loss_type)
 
         self.params = lasagne.layers.get_all_params(all_layers[-1])
         updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
@@ -103,13 +101,46 @@ class VGGNet(Ciresan2012Column):
         layer_parameter_counts = [0] + [width*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
         return [layer_input_sizes, layer_parameter_counts]
 
-    def build_objective_predictions(self, X, output):
-        if self.num_output_classes > 1:
-            objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
-            pred = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
-        else:
+    def build_loss_predictions(self, X, y, output, loss_type):
+        i5 = numpy.identity(5)
+        dx = numpy.ones((self.num_output_classes,1)) * numpy.arange(self.num_output_classes)
+        dy = dx.transpose()
+        d = (dx - dy)**2 / (self.num_output_classes-1)**2
+        dnorm = numpy.ones((1,5)) * d.sum(axis=1).reshape((1,5)).T
+
+        if not self.num_output_classes > 1:
             raise ValueError("unsupported output shape %i" % self.num_output_classes)
-        return objective, pred
+        pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
+        if loss_type == 'one-hot':
+            objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
+            loss_train = objective.get_loss(X, target=y)
+            loss_valid = objective.get_loss(X, target=y, deterministic=True)
+        elif loss_type == 'one-hot-alt':
+            cost_matrix = theano.shared(lasagne.utils.floatX(i5))
+            pred_dist_train = lasagne.layers.get_output(output, X)
+            pred_dist_valid = lasagne.layers.get_output(output, X, deterministic=True)
+            true_dist = cost_matrix[y]
+            loss_train = -T.mean(T.sum(true_dist * T.log(pred_dist_train), axis=1))
+            loss_valid = -T.mean(T.sum(true_dist * T.log(pred_dist_valid), axis=1))
+        elif loss_type == 'qclass':
+            cost_matrix = theano.shared(lasagne.utils.floatX(d / dnorm))
+            pred_dist_train = lasagne.layers.get_output(output, X)
+            pred_dist_valid = lasagne.layers.get_output(output, X, deterministic=True)
+            true_dist = cost_matrix[y]
+            loss_train = -T.mean(T.diag(T.dot(T.log(1-pred_dist_train), true_dist.T)))
+            loss_valid = -T.mean(T.diag(T.dot(T.log(1-pred_dist_valid), true_dist.T)))
+        elif loss_type == 'wsqe': # weighted square error
+            pred_dist_train = lasagne.layers.get_output(output, X)
+            pred_dist_valid = lasagne.layers.get_output(output, X, deterministic=True)
+            i5_ = theano.shared(lasagne.utils.floatX(i5))
+            weights = theano.shared(lasagne.utils.floatX(d + i5))
+            true_dist = i5_[y]
+            mislabel_weights = weights[y]
+            loss_train = T.mean(T.sum((true_dist - pred_dist_train)**2 * mislabel_weights, axis=1))
+            loss_valid = T.mean(T.sum((true_dist - pred_dist_valid)**2 * mislabel_weights, axis=1))
+        else:
+            raise ValueError("unsupported loss_type %s" % loss_type)
+        return loss_train, loss_valid, pred_valid
 
     def build_model(self, model_spec, leak_alpha, pad):
         print("Building model from JSON...")
@@ -184,7 +215,7 @@ class VGGNet(Ciresan2012Column):
                 self.historical_train_losses.append([self.iter, batch_loss])
                 yield batch_loss
 
-    def decay_learning_rate(self, patience, factor, limit=2):
+    def decay_learning_rate(self, patience, factor, limit=10):
         if (len(self.learning_rate_decayed_epochs) < limit and
             max([0] + self.learning_rate_decayed_epochs) + patience < self.epoch): # also skip first 4 epochs
 
@@ -212,7 +243,7 @@ class VGGNet(Ciresan2012Column):
         self.historical_val_losses.append([self.iter, val_loss])
         self.historical_val_kappas.append([self.iter, kappa])
         print('     epoch %i, minibatch %i/%i, validation error %f %%' %
-                          (self.epoch, self.iter + 1 % self.n_train_batches, self.n_train_batches,
+                          (self.epoch, (self.iter + 1) % self.n_train_batches, self.n_train_batches,
                            val_loss * 100.))
         print('     kappa on validation set is: %f' % kappa)
         if not silent and (self.num_output_classes == 5):
@@ -250,8 +281,8 @@ def save_results(filename, multi_params):
 
 def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
                  batch_size, leak_alpha, center, normalize, amplify,
-                 as_grey, num_output_classes, decay_patience, decay_factor):
-    runid = "%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
+                 as_grey, num_output_classes, decay_patience, decay_factor, loss_type):
+    runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
     with open('network_specs.json') as data_file:
@@ -265,9 +296,9 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
 
-    data_stream = DataStream(image_dir=dataset, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, num_output_classes=num_output_classes)
+    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, num_output_classes=num_output_classes)
 
-    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, num_output_classes=num_output_classes, pad=pad)
+    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad)
     try:
         column.train_column(max_epochs, decay_patience, decay_factor)
     except KeyboardInterrupt:
@@ -278,7 +309,7 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
     save_results(runid, [[column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches], [column.learning_rate_decayed_epochs]])
 
 if __name__ == '__main__':
-    arg_names = ['command', 'network', 'dataset', 'batch_size', 'center', 'normalize', 'init_learning_rate', 'momentum', 'leak_alpha', 'max_epochs', 'amplify', 'as_grey', 'num_output_classes', 'decay_patience', 'decay_factor']
+    arg_names = ['command', 'network', 'dataset', 'batch_size', 'center', 'normalize', 'init_learning_rate', 'momentum', 'leak_alpha', 'max_epochs', 'amplify', 'as_grey', 'num_output_classes', 'decay_patience', 'decay_factor', 'loss_type']
     arg = dict(zip(arg_names, sys.argv))
 
     network = arg.get('network') or 'vgg_mini7b'
@@ -293,7 +324,8 @@ if __name__ == '__main__':
     amplify = int(arg.get('amplify') or 1)
     as_grey = bool(arg.get('as_grey') or 0)
     num_output_classes = int(arg.get('num_output_classes') or 5)
-    decay_patience = int(arg.get('decay_patience') or 5) # set to max_epochs to avoid decay
+    decay_patience = int(arg.get('decay_patience') or max_epochs) # avoid decay by default
     decay_factor = int(arg.get('decay_factor') or 10)
+    loss_type = arg.get('loss_type') or 'one-hot'
 
-    train_drnet(network=network, init_learning_rate=init_learning_rate, momentum=momentum, max_epochs=max_epochs, dataset=dataset, batch_size=batch_size, leak_alpha=leak_alpha, center=center, normalize=normalize, amplify=amplify, as_grey=as_grey, num_output_classes=num_output_classes, decay_patience=decay_patience, decay_factor=decay_factor)
+    train_drnet(network=network, init_learning_rate=init_learning_rate, momentum=momentum, max_epochs=max_epochs, dataset=dataset, batch_size=batch_size, leak_alpha=leak_alpha, center=center, normalize=normalize, amplify=amplify, as_grey=as_grey, num_output_classes=num_output_classes, decay_patience=decay_patience, decay_factor=decay_factor, loss_type=loss_type)
