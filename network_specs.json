@@ -260,7 +260,7 @@
             { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
             { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
         ],
-        "desc": "vgg_mini7b_leak with all 4 CONV->CONV dropouts at 0.2",
+        "desc": "vgg_mini7b_leak with all 4 CONV->CONV dropouts taken out",
         "trials": []
     },
     "vgg_mini8" : {
