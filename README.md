@@ -64,12 +64,14 @@ Place `trainLabels.csv` into `data/train`
 
 #### Full Size Originals -> Smaller Originals (~2 hours)
 
-Ex:
+(Ex) This will create 3 batchfiles for graphicsmagick to output 256x256 pngs:
 
 ```
-mkdir data/train/centered_crop
-python data/create_resize_batchfiles.py data/train/orig/ data/train/centered_crop/ 2 128
+mkdir data/train/cent_crop_256
+python data/create_resize_batchfiles.py data/train/orig/ data/train/cent_crop_256/ 2 256 3
 ```
+
+Then follow the on screen directions, which will list what commands to run to process the images cataloged in the generated batchfiles.
 
 #### Standardization
 

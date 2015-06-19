@@ -50,11 +50,13 @@ if __name__ == '__main__':
     groups = numpy.split(files, split_idxs[:-1])
 
     if mode == 1:
-        print gm_batchfiles(groups, size, in_dir, out_dir, simple_crop_batchfile)
+        files = gm_batchfiles(groups, size, in_dir, out_dir, simple_crop_batchfile)
     elif mode == 2:
-        print gm_batchfiles(groups, size, in_dir, out_dir, centered_crop_batchfile)
+        files = gm_batchfiles(groups, size, in_dir, out_dir, centered_crop_batchfile)
     else:
         raise ValueError("unsupported mode %i" % mode)
 
     print 'done'
-    print 'run: gm batch -echo on -feedback on XXX'
+    print("You have %i commands to run:" % len(files))
+    for filename in files:
+        print "gm batch -echo on -feedback on %s" % filename
