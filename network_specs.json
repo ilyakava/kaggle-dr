@@ -374,21 +374,5 @@
             "3rd run is getting 4.45 mins per epoch but validation error still seems random. Confusion matrix shows that the model just puts all the images into one class. After 9th epoch, it puts them all in class 3, 2 mostly, but also 4 sometimes, and then 1 forever. Which is pretty odd.",
             "centering and normalizing across channels now. Still not getting away from kappa, but guessed all 2 instead of all 0 first..."
         ]
-    },
-    "vgg_mini6" : {
-        "rec_input_size": 112,
-        "pad": 1,
-        "layers": [
-            [3,64,2],
-            [3,128,2],
-            [3,256,2],
-            [3,512,2],
-            [1,256],
-            [1,256]
-        ],
-        "trials": [
-            "first run ever, total failure, kappa wouldn't budge from 0. 9 mins per epoch. Error seemed pretty random and oscillated between 26.328125 and 85.312500. I did forget to subtract the mean pixel though.",
-            "second run gets 7 mins per epoch with partial_sum option. Error still random even though I remembered to subtract mean this time."
-        ]
     }
 }
