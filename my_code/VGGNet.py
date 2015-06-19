@@ -23,6 +23,7 @@ from ciresan.code.ciresan2012 import Ciresan2012Column
 # this repo
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
+import my_code.train_args as train_args
 
 import pdb
 
@@ -250,7 +251,7 @@ class VGGNet(Ciresan2012Column):
             print_confusion_matrix(M)
         return [val_loss, kappa]
 
-    def train_column(self, max_epochs, decay_patience, decay_factor, validations_per_epoch=1):
+    def train_column(self, max_epochs, decay_patience, decay_factor, validations_per_epoch):
         print("Training...")
         start_time = time.clock()
         batch_multiple_to_validate = self.n_train_batches // validations_per_epoch
@@ -281,7 +282,8 @@ def save_results(filename, multi_params):
 
 def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
                  batch_size, leak_alpha, center, normalize, amplify,
-                 as_grey, num_output_classes, decay_patience, decay_factor, loss_type):
+                 as_grey, num_output_classes, decay_patience, decay_factor,
+                 loss_type, validations_per_epoch):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
@@ -300,7 +302,7 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
 
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad)
     try:
-        column.train_column(max_epochs, decay_patience, decay_factor)
+        column.train_column(max_epochs, decay_patience, decay_factor, validations_per_epoch)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     except UnsupportedPredictedClasses:
@@ -309,23 +311,21 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
     save_results(runid, [[column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches], [column.learning_rate_decayed_epochs]])
 
 if __name__ == '__main__':
-    arg_names = ['command', 'network', 'dataset', 'batch_size', 'center', 'normalize', 'init_learning_rate', 'momentum', 'leak_alpha', 'max_epochs', 'amplify', 'as_grey', 'num_output_classes', 'decay_patience', 'decay_factor', 'loss_type']
-    arg = dict(zip(arg_names, sys.argv))
+    _ = train_args.get()
 
-    network = arg.get('network') or 'vgg_mini7b'
-    dataset = arg.get('dataset') or "data/train/centered_crop/" # data/train_digit/128/ alternative
-    batch_size = int(arg.get('batch_size') or 128)
-    center = int(arg.get('center') or 0)
-    normalize = int(arg.get('normalize') or 0)
-    init_learning_rate = float(arg.get('init_learning_rate') or 0.01)
-    momentum = float(arg.get('momentum') or 0.9)
-    leak_alpha = int(arg.get('leak_alpha') or 100)
-    max_epochs = int(arg.get('max_epochs') or 100) # useful to change to 1 for a quick test run
-    amplify = int(arg.get('amplify') or 1)
-    as_grey = bool(arg.get('as_grey') or 0)
-    num_output_classes = int(arg.get('num_output_classes') or 5)
-    decay_patience = int(arg.get('decay_patience') or max_epochs) # avoid decay by default
-    decay_factor = int(arg.get('decay_factor') or 10)
-    loss_type = arg.get('loss_type') or 'one-hot'
-
-    train_drnet(network=network, init_learning_rate=init_learning_rate, momentum=momentum, max_epochs=max_epochs, dataset=dataset, batch_size=batch_size, leak_alpha=leak_alpha, center=center, normalize=normalize, amplify=amplify, as_grey=as_grey, num_output_classes=num_output_classes, decay_patience=decay_patience, decay_factor=decay_factor, loss_type=loss_type)
+    train_drnet(network=_.network,
+                init_learning_rate=_.learning_rate,
+                momentum=_.momentum,
+                max_epochs=_.max_epochs,
+                dataset=_.dataset,
+                batch_size=_.batch_size,
+                leak_alpha=_.alpha,
+                center=_.center,
+                normalize=_.normalize,
+                amplify=_.amplify,
+                as_grey=_.as_grey,
+                num_output_classes=_.output_classes,
+                decay_patience=_.decay_patience,
+                decay_factor=_.decay_factor,
+                loss_type=_.loss_type,
+                validations_per_epoch=_.validations_per_epoch)

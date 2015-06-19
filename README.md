@@ -10,6 +10,8 @@
 
 `sudo pip install theano scikit-learn scikit-image`
 
+If `skimage.io` has issues, try: `sudo pop install -U scikit-image`.
+
 ### Install Lasange
 
 ```
