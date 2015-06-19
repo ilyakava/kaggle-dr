@@ -301,6 +301,21 @@
         "desc": "Twice as fat as vgg_mini7b",
         "trials": []
     },
+    "vgg_mini6" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini7b_leak with 1 CONV layer removed (the only one w/o pooling)",
+        "trials": []
+    },
     "vgg_mini7c" : {
         "rec_input_size": 128,
         "pad": 0,

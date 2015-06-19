@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import pdb
 
-def plot_results(result_file):
+def plot_results(result_file, max_epoch):
     f = open(result_file)
     historical_train_losses, historical_val_losses, historical_val_kappas, n_iter_per_epoch = cPickle.load(f)
     n_iter_per_epoch = float(n_iter_per_epoch)
@@ -55,10 +55,14 @@ def plot_results(result_file):
         plt.axvline(x=epoch, color='g')
     plt.title(result_file)
     plt.ylim((-1,1.5))
-    plt.xlim((0,len(train[:,1]) / n_iter_per_epoch))
+    if max_epoch:
+        plt.xlim((0,max_epoch))
+    else:
+        plt.xlim((0,len(train[:,1]) / n_iter_per_epoch))
     plt.legend(loc=3)
     plt.grid()
     plt.show()
 
 if __name__ == '__main__':
-    plot_results(sys.argv[1])
+    max_epoch = float(sys.argv[2]) if len(sys.argv) > 2 else None
+    plot_results(sys.argv[1], max_epoch)
