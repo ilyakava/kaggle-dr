@@ -74,8 +74,8 @@ def get():
                         help="Number of times to validate and print confusion matrix per epoch.")
     parser.add_argument("-g",
                         "--as-grey",
-                        type=bool,
-                        default=True,
+                        type=int,
+                        default=1,
                         help="Colorspace of input images desired. Can be less than but not greater than in number of channels as --dataset.")
 
     return parser.parse_args()
