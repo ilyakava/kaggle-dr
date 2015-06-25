@@ -76,6 +76,6 @@ def get():
                         "--as-grey",
                         type=int,
                         default=1,
-                        help="Colorspace of input images desired. Can be less than but not greater than in number of channels as --dataset.")
+                        help="1 for grayscale, 0 for rgb")
 
     return parser.parse_args()
