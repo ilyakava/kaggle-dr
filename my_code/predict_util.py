@@ -42,3 +42,12 @@ def QWK(y_true, y_pred, K=5):
     df = d.flatten()
     score = 1 - (sum(df * Mf)/sum(Mf)) / (sum(df * Ef) / sum(Ef))
     return [score, M]
+
+def binary_accuracy_precision(true_labels, predicted_labels):
+    true_labels = numpy.array(true_labels)
+    predicted_labels = numpy.array(predicted_labels)
+    accuracy = sum(true_labels == predicted_labels) / float(len(true_labels))
+    tp = sum((true_labels + predicted_labels) == 2)
+    fp = sum((predicted_labels - true_labels) == 1)
+    precision = tp / float(tp + fp)
+    return(accuracy, precision)

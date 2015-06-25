@@ -91,7 +91,8 @@ class BlockDesigner(object):
                 for id in block[y]:
                     self.reservoir[y].remove(id)
             blocks.append(block)
-        # a second separate loop to guarantee a base ideal_counts in each partition
+        # a second separate loop for fill in, rather than being integrated into the above
+        # loop, guarantees base ideal_counts in each partition
         for i in range(num_blocks):
             random_additions = random.sample(self.ids(), num_random_additions)
             for id in random_additions:
@@ -125,7 +126,7 @@ class BlockDesigner(object):
                 num_ys_wanted = num_ys_needed
                 # This here is the reason that this method should only be used to
                 # break off single large blocks. If this method is used repeatedly
-                # the the proportions of the reservoir will become unbalanced. Attempts
+                # then the proportions of the reservoir will become unbalanced. Attempts
                 # were made earlier to compensate with random ways to select 'fill in'
                 # example classes, but in the end, the best strategy is to have an
                 # additional break_off_multiple_blocks method

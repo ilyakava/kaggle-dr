@@ -73,9 +73,19 @@ python data/create_resize_batchfiles.py data/train/orig/ data/train/cent_crop_25
 
 Then follow the on screen directions, which will list what commands to run to process the images cataloged in the generated batchfiles.
 
-#### Standardization
+#### Alignment (~3 seconds an image)
 
-... Coming soon
+To reduce noise in the training dataset, detect which images are inverted (taken with an indirect ophthalmoscope) and which are left/right, and invert the images until optic nerve is on the right side of the image.
+
+`python my_code/batch_align.py data/train/orig/ n i`
+
+This will run the ith of n partitions that creates a csv of which inversions to perform on the images in that partition. For example, you could run:
+
+`python my_code/batch_align.py data/train/orig/ 3 1`
+`python my_code/batch_align.py data/train/orig/ 3 2`
+`python my_code/batch_align.py data/train/orig/ 3 3`
+
+In three different `screen` sessions for parallel processing. Each will report having created a csv file. You can join these multiple csvs into one with: `awk 'FNR==1 && NR!=1{next;}{print}' *.csv > my.csv`
 
 ## The Network
 
