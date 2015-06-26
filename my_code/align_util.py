@@ -181,7 +181,7 @@ class FundusPhotoAligner(object):
         grouped_img_names = [["%s_left.%s" % (id,ext), "%s_right.%s" % (id,ext)] for id in ids]
         self.labels = {}
 
-        print "| " + ("⚐ ⚑ " * 19) + "|"
+        print ''.join(["    %i%%|" % (j*10) for j in xrange(1,10)] + ['  100%|'])
         pb = NyanBar(tasks=len(grouped_img_names))
         with open(outfile_name, 'w') as csvfile:
             writer = csv.writer(csvfile)
@@ -235,7 +235,7 @@ if __name__ == '__main__':
         with open(label_csv, 'rU') as csvfile:
             reader = csv.reader(csvfile, dialect=csv.excel_tab, delimiter=',')
             next(reader, None) # skip header
-            print "| " + ("⚐ ⚑ " * 19) + "|"
+            print ''.join(["    %i%%|" % (j*10) for j in xrange(1,10)] + ['  100%|'])
             pb = NyanBar(tasks=(sum(1 for row in open(label_csv, 'rU'))-1))
             for row in reader:
                 imgname = row[0]

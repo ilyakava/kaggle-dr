@@ -8,7 +8,7 @@
 
 ### Install General Python deps:
 
-`sudo pip install theano scikit-learn scikit-image`
+`sudo pip install theano scikit-learn scikit-image nyanbar`
 
 If `skimage.io` has issues, try: `sudo pop install -U scikit-image`.
 
@@ -68,7 +68,7 @@ Place `trainLabels.csv` into `data/train`
 
 ```
 mkdir data/train/cent_crop_256
-python data/create_resize_batchfiles.py data/train/orig/ data/train/cent_crop_256/ 2 256 3
+python my_code/create_resize_batchfiles.py data/train/orig/ data/train/cent_crop_256/ 2 256 3
 ```
 
 Then follow the on screen directions, which will list what commands to run to process the images cataloged in the generated batchfiles.
