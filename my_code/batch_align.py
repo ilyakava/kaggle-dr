@@ -1,6 +1,7 @@
 import sys
 from os import listdir
 import numpy
+import re
 from my_code.align_util import FundusPhotoAligner
 
 import pdb
@@ -15,8 +16,11 @@ if __name__ == '__main__':
 
     assert((num_total_batches == 1) or (num_total_batches % 2 == 0))
 
-    files = numpy.array([in_dir + f for f in listdir(in_dir)])
+    files = numpy.array([in_dir + f for f in listdir(in_dir) if re.search('\.(jpeg|png)', f)])
+    files.sort()
     split_idx_multiple = len(files) / num_total_batches
+    if not split_idx_multiple % 2 == 0:
+        split_idx_multiple -= 1
     split_idxs = (numpy.arange(num_total_batches) + 1) * split_idx_multiple
     groups = numpy.split(files, split_idxs[:-1])
 
