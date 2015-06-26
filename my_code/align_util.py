@@ -178,7 +178,7 @@ class FundusPhotoAligner(object):
         ext = img_names[0].split('.')[-1]
         ids = set([img_path.split('_')[0] for img_path in img_names])
         assert((len(ids) * 2) == len(img_names))
-        grouped_img_names = [["%s_left.%s" % (id,ext), "%s_right.%s" % (id,ext)] for id in ids]
+        grouped_img_names = [["%s_left" % id, "%s_right" % id] for id in ids]
         self.labels = {}
 
         print ''.join(["    %i%%|" % (j*10) for j in xrange(1,10)] + ['  100%|'])
@@ -187,7 +187,7 @@ class FundusPhotoAligner(object):
             writer = csv.writer(csvfile)
             writer.writerow(['image','horizontal_flip','vertical_flip'])
             for img_names in grouped_img_names:
-                img_paths = ["%s/%s" % (path, name) for name in img_names]
+                img_paths = ["%s/%s.%s" % (path, name, ext) for name in img_names]
                 fundus_photos = [FundusPhoto(img_path) for img_path in img_paths]
                 for i, fundus_photo in enumerate(fundus_photos):
                     fundus_photo.refine_center()

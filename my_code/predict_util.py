@@ -4,16 +4,12 @@ from sklearn.metrics import confusion_matrix
 import pdb
 
 class UnsupportedPredictedClasses(Exception):
-    def __init__(self, message, errors):
-        # Call the base class constructor with the parameters it needs
-        super(UnsupportedPredictedClasses, self).__init__(message)
+    pass
 
 def assert_valid_prediction(y_pred, K):
     forbidden_klasses = set(y_pred.flatten()) - set(list(range(K)))
     if len(forbidden_klasses):
-        err = "Unsupported Predicted Classes: {}".format(forbidden_klasses)
-        print(err)
-        raise UnsupportedPredictedClasses()
+        raise UnsupportedPredictedClasses(forbidden_klasses)
 
 def print_confusion_matrix(M):
     print("Confusion Matrix")

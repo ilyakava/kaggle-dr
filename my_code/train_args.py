@@ -6,7 +6,7 @@ def get():
     parser.add_argument("-n",
                         "--network",
                         type=str,
-                        default="vgg_mini7b_leak")
+                        default="vgg_mini7b_leak_sig")
     parser.add_argument("-d",
                         "--dataset",
                         type=str,
@@ -63,10 +63,15 @@ def get():
                         type=int,
                         default=2,
                         help="Number with which to divided learning rate after --decay-patience is passed.")
+    parser.add_argument("-i",
+                        "--decay-limit",
+                        type=int,
+                        default=10,
+                        help="Maximum number of times to decay learning rate.")
     parser.add_argument("-L",
                         "--loss-type",
                         type=str,
-                        default="one-hot")
+                        default="nnrank-re")
     parser.add_argument("-P",
                         "--validations-per-epoch",
                         type=int,
@@ -75,7 +80,12 @@ def get():
     parser.add_argument("-g",
                         "--as-grey",
                         type=int,
-                        default=1,
+                        default=0,
                         help="1 for grayscale, 0 for rgb")
+    parser.add_argument("-F",
+                        "--train-flip",
+                        type=str,
+                        default='no_flip',
+                        help="Method name or csv file that contains complete information on whether to flip a given training image.")
 
     return parser.parse_args()

@@ -102,41 +102,45 @@ class VGGNet(object):
 
     def build_loss_predictions(self, X, y, output, loss_type):
         i5 = numpy.identity(5)
-        dx = numpy.ones((self.num_output_classes,1)) * numpy.arange(self.num_output_classes)
-        dy = dx.transpose()
-        d = (dx - dy)**2 / (self.num_output_classes-1)**2
-        dnorm = numpy.ones((1,5)) * d.sum(axis=1).reshape((1,5)).T
+        nnrank_target = numpy.tril(numpy.ones((self.num_output_classes,self.num_output_classes)))
 
         if not self.num_output_classes > 1:
             raise ValueError("unsupported output shape %i" % self.num_output_classes)
-        pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
         if loss_type == 'one-hot':
+            pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
             objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
             loss_train = objective.get_loss(X, target=y)
             loss_valid = objective.get_loss(X, target=y, deterministic=True)
-        elif loss_type == 'one-hot-alt':
-            cost_matrix = theano.shared(lasagne.utils.floatX(i5))
-            pred_dist_train = lasagne.layers.get_output(output, X)
-            pred_dist_valid = lasagne.layers.get_output(output, X, deterministic=True)
-            true_dist = cost_matrix[y]
-            loss_train = -T.mean(T.sum(true_dist * T.log(pred_dist_train), axis=1))
-            loss_valid = -T.mean(T.sum(true_dist * T.log(pred_dist_valid), axis=1))
-        elif loss_type == 'qclass':
-            cost_matrix = theano.shared(lasagne.utils.floatX(d / dnorm))
-            pred_dist_train = lasagne.layers.get_output(output, X)
-            pred_dist_valid = lasagne.layers.get_output(output, X, deterministic=True)
-            true_dist = cost_matrix[y]
-            loss_train = -T.mean(T.diag(T.dot(T.log(1-pred_dist_train), true_dist.T)))
-            loss_valid = -T.mean(T.diag(T.dot(T.log(1-pred_dist_valid), true_dist.T)))
-        elif loss_type == 'wsqe': # weighted square error
-            pred_dist_train = lasagne.layers.get_output(output, X)
-            pred_dist_valid = lasagne.layers.get_output(output, X, deterministic=True)
-            i5_ = theano.shared(lasagne.utils.floatX(i5))
-            weights = theano.shared(lasagne.utils.floatX(d + i5))
-            true_dist = i5_[y]
-            mislabel_weights = weights[y]
-            loss_train = T.mean(T.sum((true_dist - pred_dist_train)**2 * mislabel_weights, axis=1))
-            loss_valid = T.mean(T.sum((true_dist - pred_dist_valid)**2 * mislabel_weights, axis=1))
+        elif loss_type == 'one-hot-ce': # manual version of one-hot, totally equivalent (in theory and practice)
+            pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
+            klass_targets = theano.shared(lasagne.utils.floatX(i5))
+            target = klass_targets[y]
+            train_out = lasagne.layers.get_output(output, X)
+            val_out = lasagne.layers.get_output(output, X, deterministic=True)
+            loss_train = -T.mean(T.sum(target*T.log(train_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(val_out), axis=1))
+        elif loss_type == 'one-hot-re':
+            pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
+            klass_targets = theano.shared(lasagne.utils.floatX(i5))
+            target = klass_targets[y]
+            train_out = lasagne.layers.get_output(output, X)
+            val_out = lasagne.layers.get_output(output, X, deterministic=True)
+            loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(val_out) + (1-target)*T.log(1-val_out), axis=1))
+        elif loss_type == 'nnrank-mse':
+            pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1) - 1
+            klass_targets = theano.shared(lasagne.utils.floatX(nnrank_target))
+            target_y = klass_targets[y]
+            loss_train = T.mean(T.sum((target_y - lasagne.layers.get_output(output, X))**2, axis=1))
+            loss_valid = T.mean(T.sum((target_y - lasagne.layers.get_output(output, X, deterministic=True))**2, axis=1))
+        elif loss_type == 'nnrank-re':
+            pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1) - 1
+            klass_targets = theano.shared(lasagne.utils.floatX(nnrank_target))
+            target = klass_targets[y]
+            train_out = lasagne.layers.get_output(output, X)
+            val_out = lasagne.layers.get_output(output, X, deterministic=True)
+            loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(val_out) + (1-target)*T.log(1-val_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s" % loss_type)
         return loss_train, loss_valid, pred_valid
@@ -214,7 +218,7 @@ class VGGNet(object):
                 self.historical_train_losses.append([self.iter, batch_loss])
                 yield batch_loss
 
-    def decay_learning_rate(self, patience, factor, limit=10):
+    def decay_learning_rate(self, patience, factor, limit):
         if (len(self.learning_rate_decayed_epochs) < limit and
             max([0] + self.learning_rate_decayed_epochs) + patience < self.epoch): # also skip first 4 epochs
 
@@ -225,7 +229,7 @@ class VGGNet(object):
                 self.learning_rate_decayed_epochs.append(self.epoch)
                 self.learning_rate = self.learning_rate / factor
 
-    def validate(self, decay_patience, decay_factor, silent=False):
+    def validate(self, decay_patience, decay_factor, decay_limit, silent=False):
         """
         Iterates through validation minibatches
         """
@@ -237,7 +241,7 @@ class VGGNet(object):
             valid_predictions.extend(prediction)
         [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions), self.num_output_classes)
         val_loss = numpy.mean(batch_valid_losses)
-        self.decay_learning_rate(decay_patience, decay_factor)
+        self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
         # housekeeping
         self.historical_val_losses.append([self.iter, val_loss])
         self.historical_val_kappas.append([self.iter, kappa])
@@ -249,7 +253,7 @@ class VGGNet(object):
             print_confusion_matrix(M)
         return [val_loss, kappa]
 
-    def train_column(self, max_epochs, decay_patience, decay_factor, validations_per_epoch):
+    def train_column(self, max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch):
         print("Training...")
         start_time = time.clock()
         batch_multiple_to_validate = self.n_train_batches // validations_per_epoch
@@ -267,7 +271,7 @@ class VGGNet(object):
                     mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(self.iter*60.)
                     print('training @ iter = %i @ %.1fm (ETA %.1fm). Cur training error is %f %%' %
                         (self.iter, ((time.clock() - start_time )/60.), mins_per_epoch*(max_epochs-self.epoch), 100*batch_train_loss))
-                    self.validate(decay_patience, decay_factor)
+                    self.validate(decay_patience, decay_factor, decay_limit)
                     print('     averaging %f mins per epoch' % mins_per_epoch)
 
     def save(self, filename=None):
@@ -294,7 +298,7 @@ def save_results(filename, multi_params):
 def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
                  batch_size, leak_alpha, center, normalize, amplify,
                  as_grey, num_output_classes, decay_patience, decay_factor,
-                 loss_type, validations_per_epoch):
+                 decay_limit, loss_type, validations_per_epoch, train_flip):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
@@ -309,15 +313,15 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
 
-    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, num_output_classes=num_output_classes)
+    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, num_output_classes=num_output_classes, train_flip=train_flip)
 
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad)
     try:
-        column.train_column(max_epochs, decay_patience, decay_factor, validations_per_epoch)
+        column.train_column(max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
-    except UnsupportedPredictedClasses:
-        print "[ERROR] UnsupportedPredictedClasses, saving results"
+    except UnsupportedPredictedClasses as e:
+        print "[ERROR] UnsupportedPredictedClasses {}, saving results".format(e.args[0])
     column.save(runid)
     save_results(runid, [[column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches], [column.learning_rate_decayed_epochs]])
 
@@ -338,5 +342,7 @@ if __name__ == '__main__':
                 num_output_classes=_.output_classes,
                 decay_patience=_.decay_patience,
                 decay_factor=_.decay_factor,
+                decay_limit=_.decay_limit,
                 loss_type=_.loss_type,
-                validations_per_epoch=_.validations_per_epoch)
+                validations_per_epoch=_.validations_per_epoch,
+                train_flip=_.train_flip)
