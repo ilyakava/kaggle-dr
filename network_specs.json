@@ -362,49 +362,5 @@
             { "type": "FC", "dropout": 0.5, "num_units": 1, "nonlinearity": "softmax" }
         ],
         "trials": []
-    },
-    "vgg_mini6d" : {
-        "rec_input_size": 112,
-        "pad": 1,
-        "layers": [
-            [3,16,2],
-            [3,32,2],
-            [3,64,2],
-            [3,128,2],
-            [1,128],
-            [1,128]
-        ],
-        "trials": []
-    },
-    "vgg_mini6c" : {
-        "rec_input_size": 112,
-        "pad": 1,
-        "layers": [
-            [3,32,2],
-            [3,64,2],
-            [3,128,2],
-            [3,256,2],
-            [1,512],
-            [1,512]
-        ],
-        "trials": [
-            "error also completely stationary. 1.6 mins per epoch, tried a lower learning rate for kicks, all classes stuck at 0."
-        ]
-    },
-    "vgg_mini6b" : {
-        "rec_input_size": 112,
-        "pad": 1,
-        "layers": [
-            [3,64,2,3],
-            [3,128,2,3],
-            [3,128,2,3],
-            [3,256,2,3],
-            [1,512],
-            [1,512]
-        ],
-        "trials": [
-            "3rd run is getting 4.45 mins per epoch but validation error still seems random. Confusion matrix shows that the model just puts all the images into one class. After 9th epoch, it puts them all in class 3, 2 mostly, but also 4 sometimes, and then 1 forever. Which is pretty odd.",
-            "centering and normalizing across channels now. Still not getting away from kappa, but guessed all 2 instead of all 0 first..."
-        ]
     }
 }

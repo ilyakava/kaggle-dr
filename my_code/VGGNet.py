@@ -18,8 +18,6 @@ import lasagne
 from lasagne import layers, nonlinearities
 import lasagne.layers.cuda_convnet
 from lasagne.nonlinearities import LeakyRectify
-# git submodules
-from ciresan.code.ciresan2012 import Ciresan2012Column
 # this repo
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
@@ -27,7 +25,7 @@ import my_code.train_args as train_args
 
 import pdb
 
-class VGGNet(Ciresan2012Column):
+class VGGNet(object):
     def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad=1, params=None):
         self.column_params = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, pad]
         layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad)
@@ -271,6 +269,19 @@ class VGGNet(Ciresan2012Column):
                         (self.iter, ((time.clock() - start_time )/60.), mins_per_epoch*(max_epochs-self.epoch), 100*batch_train_loss))
                     self.validate(decay_patience, decay_factor)
                     print('     averaging %f mins per epoch' % mins_per_epoch)
+
+    def save(self, filename=None):
+        """
+        Will need to load last layer W,b to first layer W,b
+        """
+        name = filename or 'CNN_%iLayers_t%i' % (len(self.params) / 2, int(time.time()))
+
+        print('Saving Model as "%s"...' % name)
+        f = open('./models/'+name+'.pkl', 'wb')
+
+        cPickle.dump([param.get_value(borrow=True) for param in self.params], f, -1)
+        cPickle.dump(self.column_params, f, -1)
+        f.close()
 
 def save_results(filename, multi_params):
     name = filename or 'CNN_%iParams_t%i' % (len(self.params) / 2, int(time.time()))
