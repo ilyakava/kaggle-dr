@@ -53,7 +53,8 @@ class DataStream(object):
                  center=0,
                  normalize=0,
                  amplify=1,
-                 train_flip='no_flip'):
+                 train_flip='no_flip',
+                 shuffle=1):
         self.image_dir = image_dir
         self.image_shape = image_shape
         self.cache_size = cache_size # size in images
@@ -70,13 +71,12 @@ class DataStream(object):
 
         self.valid_dataset_size = 4864
         valid_examples = bd.break_off_block(self.valid_dataset_size)
-        num_batches = int(bd.size() / self.batch_size)
-        self.train_dataset_size = num_batches * self.batch_size
-        batches_of_train_examples = bd.break_off_multiple_blocks(num_batches, self.batch_size)
+        self.train_examples = bd.remainder()
+        self.n_train_batches = int(bd.size() / self.batch_size)
+        self.train_dataset_size = self.n_train_batches * self.batch_size
 
-        # unlike train_dataset, each batch_size slice of valid_dataset does not have the same label distribution
         self.valid_dataset = self.setup_valid_dataset(valid_examples)
-        self.train_dataset = self.setup_train_dataset(batches_of_train_examples)
+        self.train_dataset = None if shuffle else self.setup_train_dataset()
 
         if self.center == 1 or self.normalize == 1:
             self.calc_mean_std_image()
@@ -91,15 +91,16 @@ class DataStream(object):
         """
         Yields a x_cache_block, has a size that is a multiple of training batches
         """
+        train_dataset = self.train_dataset or self.setup_train_dataset()
         x_cache_block = numpy.zeros(((self.cache_size,) + self.image_shape), dtype=theano.config.floatX)
-        n_cache_blocks = int(len(self.train_dataset["y"]) / float(self.cache_size)) # rounding down skips the leftovers
+        n_cache_blocks = int(len(train_dataset["y"]) / float(self.cache_size)) # rounding down skips the leftovers
         assert(n_cache_blocks)
         for ith_cache_block in xrange(n_cache_blocks):
             ith_cache_block_end = (ith_cache_block + 1) * self.cache_size
             ith_cache_block_slice = slice(ith_cache_block * self.cache_size, ith_cache_block_end)
-            for i, image in enumerate(self.train_dataset["X"][ith_cache_block_slice]):
+            for i, image in enumerate(train_dataset["X"][ith_cache_block_slice]):
                 x_cache_block[i, ...] = self.feed_image(image, self.train_flip_lambda)
-            yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(self.train_dataset["y"][ith_cache_block_slice], dtype='int32')
+            yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(train_dataset["y"][ith_cache_block_slice], dtype='int32')
 
     def read_image(self, image_name, extension=".png"):
         """
@@ -140,11 +141,12 @@ class DataStream(object):
         print("Calculating mean and std dev image...")
         mean = numpy.zeros(self.image_shape, dtype=theano.config.floatX)
         mean_sqr = numpy.zeros(self.image_shape, dtype=theano.config.floatX)
-        N = len(self.train_dataset["y"])
-        for image in self.train_dataset["X"]:
-            img = self.read_image(image)
-            mean += img
-            mean_sqr += numpy.square(img)
+        N = sum([len(ids) for y, ids in self.train_examples.items()]) # self.train_dataset_size + remainders
+        for y, ids in self.train_examples.items():
+            for image in ids:
+                img = self.read_image(image)
+                mean += img
+                mean_sqr += numpy.square(img)
         self.mean = mean / N
         self.std = numpy.sqrt(numpy.abs(mean_sqr / N - numpy.square(self.mean)))
 
@@ -157,10 +159,12 @@ class DataStream(object):
                 labels.append(y)
         return {"X": images, "y": labels}
 
-    def setup_train_dataset(self, blocks):
+    def setup_train_dataset(self):
         """
-        Each batch_size of examples follows the same distribution
+        Each self.batch_size of examples follows the same distribution
         """
+        bd = BlockDesigner(self.train_examples)
+        blocks = bd.break_off_multiple_blocks(self.n_train_batches, self.batch_size)
         images = []
         labels = []
         for block in blocks:

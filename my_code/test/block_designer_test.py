@@ -37,6 +37,35 @@ class CreateTrainValTestSet(unittest.TestCase):
     def get_counts(self, dataset):
         return numpy.array([len(dataset[klass]) for klass in reversed(xrange(self.K))])
 
+    def test_instantiating_and_splitting_multiple_times(self):
+        valid_dataset = self.bd.break_off_block(4864)
+        train_dataset = self.bd.remainder()
+        train_batches_to_take = self.bd.size() // 128
+
+        bd2 = BlockDesigner(train_dataset)
+        batches2 = bd2.break_off_multiple_blocks(train_batches_to_take, 128)
+        bd3 = BlockDesigner(train_dataset)
+        batches3 = bd3.break_off_multiple_blocks(train_batches_to_take, 128)
+
+        ideal_counts = numpy.array([int(128 * p) for p in self.true_proportions])
+
+        for i in xrange(len(batches2)):
+            counts = self.get_counts(batches2[i])
+            self.failUnless(
+                sum(counts) == 128
+            )
+            self.failUnless(
+                sum(abs(self.get_counts(batches2[i]) - ideal_counts)) < SAMPLE_COUNT_ERROR_MARGIN
+            )
+
+            counts = self.get_counts(batches3[i])
+            self.failUnless(
+                sum(counts) == 128
+            )
+            self.failUnless(
+                sum(abs(self.get_counts(batches3[i]) - ideal_counts)) < SAMPLE_COUNT_ERROR_MARGIN
+            )
+
     def test_small_blocks_for_consistency(self):
         valid_dataset = self.bd.break_off_block(4864)
 

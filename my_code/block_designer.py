@@ -54,7 +54,9 @@ class BlockDesigner(object):
         assert(type(source.keys()[0]) is int)
         assert(type(source.values()[0]) is list)
         assert(type(source.values()[0][0]) is str)
-        self.reservoir = source
+        for y, ids in source.items():
+            for id in ids:
+                self.reservoir[y].append(id)
 
     def invert_reservoir(self):
         reference = {}

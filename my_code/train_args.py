@@ -87,5 +87,10 @@ def get():
                         type=str,
                         default='no_flip',
                         help="Method name or csv file that contains complete information on whether to flip a given training image.")
+    parser.add_argument("-s",
+                        "--shuffle",
+                        type=int,
+                        default=0,
+                        help="1 to shuffle training set every epoch, 0 to use the same ordering")
 
     return parser.parse_args()

@@ -34,7 +34,7 @@ class VGGNet(object):
         print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
         # data setup
         self.ds = data_stream
-        self.n_train_batches = self.ds.train_dataset_size // batch_size
+        self.n_train_batches = self.ds.n_train_batches
         self.n_valid_batches = self.ds.valid_dataset_size // batch_size
         self.batches_per_cache_block = self.ds.cache_size // batch_size
         self.num_output_classes = num_output_classes
@@ -296,7 +296,7 @@ def save_results(filename, multi_params):
 def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
                  batch_size, leak_alpha, center, normalize, amplify,
                  as_grey, num_output_classes, decay_patience, decay_factor,
-                 decay_limit, loss_type, validations_per_epoch, train_flip):
+                 decay_limit, loss_type, validations_per_epoch, train_flip, shuffle):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
@@ -311,7 +311,7 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
 
-    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip)
+    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle)
 
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad)
     try:
@@ -344,4 +344,5 @@ if __name__ == '__main__':
                 decay_limit=_.decay_limit,
                 loss_type=_.loss_type,
                 validations_per_epoch=_.validations_per_epoch,
-                train_flip=_.train_flip)
+                train_flip=_.train_flip,
+                shuffle=_.shuffle)
