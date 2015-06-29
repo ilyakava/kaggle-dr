@@ -7,6 +7,7 @@ import time
 import collections
 import uuid
 import json
+import re
 import cPickle
 import numpy
 # Deep Learning
@@ -100,49 +101,46 @@ class VGGNet(object):
         layer_parameter_counts = [0] + [width*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
         return [layer_input_sizes, layer_parameter_counts]
 
-    def build_loss_predictions(self, X, y, output, loss_type):
-        i5 = numpy.identity(5)
-        nnrank_target = numpy.tril(numpy.ones((self.num_output_classes,self.num_output_classes)))
-
-        if not self.num_output_classes > 1:
-            raise ValueError("unsupported output shape %i" % self.num_output_classes)
-        if loss_type == 'one-hot':
+    def build_loss_predictions(self, X, y, output, loss_type, K=5):
+        if re.search('one-hot', loss_type):
+            # should be used with softmax out
+            identity = numpy.identity(K)
             pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
+            klass_targets = theano.shared(lasagne.utils.floatX(identity))
+        elif re.search('nnrank', loss_type):
+            # should be used with sigmoid out
+            if self.num_output_classes == K:
+                nnrank_target = numpy.tril(numpy.ones((K,K)))
+                pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1) - 1
+            elif self.num_output_classes == (K-1):
+                nnrank_target = numpy.array([[0]*(K-1)] + numpy.tril(numpy.ones((K-1,K-1))).tolist())
+                # TODO check for discontinuities rather than assuming none with the sum
+                # TODO do better than a shared threshold
+                pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1)
+            klass_targets = theano.shared(lasagne.utils.floatX(nnrank_target))
+        target = klass_targets[y]
+        train_out = lasagne.layers.get_output(output, X)
+        valid_out = lasagne.layers.get_output(output, X, deterministic=True)
+
+        if loss_type == 'one-hot': # requires that y has no more than self.num_output_classes classes
             objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
             loss_train = objective.get_loss(X, target=y)
             loss_valid = objective.get_loss(X, target=y, deterministic=True)
-        elif loss_type == 'one-hot-ce': # manual version of one-hot, totally equivalent (in theory and practice)
-            pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
-            klass_targets = theano.shared(lasagne.utils.floatX(i5))
-            target = klass_targets[y]
-            train_out = lasagne.layers.get_output(output, X)
-            val_out = lasagne.layers.get_output(output, X, deterministic=True)
+        elif (loss_type == 'one-hot-ce') and (self.num_output_classes == K):
+            # manual version of one-hot, totally equivalent (in theory and practice)
             loss_train = -T.mean(T.sum(target*T.log(train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(val_out), axis=1))
-        elif loss_type == 'one-hot-re':
-            pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
-            klass_targets = theano.shared(lasagne.utils.floatX(i5))
-            target = klass_targets[y]
-            train_out = lasagne.layers.get_output(output, X)
-            val_out = lasagne.layers.get_output(output, X, deterministic=True)
+            loss_valid = -T.mean(T.sum(target*T.log(valid_out), axis=1))
+        elif (loss_type == 'one-hot-re') and (self.num_output_classes == K):
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(val_out) + (1-target)*T.log(1-val_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         elif loss_type == 'nnrank-mse':
-            pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1) - 1
-            klass_targets = theano.shared(lasagne.utils.floatX(nnrank_target))
-            target_y = klass_targets[y]
-            loss_train = T.mean(T.sum((target_y - lasagne.layers.get_output(output, X))**2, axis=1))
-            loss_valid = T.mean(T.sum((target_y - lasagne.layers.get_output(output, X, deterministic=True))**2, axis=1))
+            loss_train = T.mean(T.sum((target - train_out)**2, axis=1))
+            loss_valid = T.mean(T.sum((target - valid_out)**2, axis=1))
         elif loss_type == 'nnrank-re':
-            pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1) - 1
-            klass_targets = theano.shared(lasagne.utils.floatX(nnrank_target))
-            target = klass_targets[y]
-            train_out = lasagne.layers.get_output(output, X)
-            val_out = lasagne.layers.get_output(output, X, deterministic=True)
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(val_out) + (1-target)*T.log(1-val_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         else:
-            raise ValueError("unsupported loss_type %s" % loss_type)
+            raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid
 
     def build_model(self, model_spec, leak_alpha, pad):
@@ -239,7 +237,7 @@ class VGGNet(object):
             batch_valid_loss, prediction = self.validate_batch(j)
             batch_valid_losses.append(batch_valid_loss)
             valid_predictions.extend(prediction)
-        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions), self.num_output_classes)
+        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions))
         val_loss = numpy.mean(batch_valid_losses)
         self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
         # housekeeping
@@ -249,7 +247,7 @@ class VGGNet(object):
                           (self.epoch, (self.iter + 1) % self.n_train_batches, self.n_train_batches,
                            val_loss * 100.))
         print('     kappa on validation set is: %f' % kappa)
-        if not silent and (self.num_output_classes == 5):
+        if not silent:
             print_confusion_matrix(M)
         return [val_loss, kappa]
 
@@ -313,7 +311,7 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
 
-    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, num_output_classes=num_output_classes, train_flip=train_flip)
+    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip)
 
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad)
     try:

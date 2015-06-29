@@ -53,7 +53,6 @@ class DataStream(object):
                  center=0,
                  normalize=0,
                  amplify=1,
-                 num_output_classes=5,
                  train_flip='no_flip'):
         self.image_dir = image_dir
         self.image_shape = image_shape
@@ -67,7 +66,7 @@ class DataStream(object):
         self.train_flip_lambda, self.val_flip_lambda = get_train_val_flip_lambda(train_flip)
 
         csvname = '/'.join(image_dir.split('/')[:-2] + ["trainLabels.csv"]) # csv should rest 1 dir up from image dir provided
-        bd = BlockDesigner(csvname, num_output_classes)
+        bd = BlockDesigner(csvname)
 
         self.valid_dataset_size = 4864
         valid_examples = bd.break_off_block(self.valid_dataset_size)

@@ -12,12 +12,15 @@ def assert_valid_prediction(y_pred, K):
         raise UnsupportedPredictedClasses(forbidden_klasses)
 
 def print_confusion_matrix(M):
-    print("Confusion Matrix")
-    print("T\P|    0 |    1 |    2 |    3 |    4 |")
-    print("---|------|------|------|------|------|")
-    for i, y in enumerate(xrange(5)):
-        print(" %d | %4d | %4d | %4d | %4d | %4d |" % ((y, ) + tuple(M[i])))
+    if M.shape == (5,5):
+        print("Confusion Matrix")
+        print("T\P|    0 |    1 |    2 |    3 |    4 |")
         print("---|------|------|------|------|------|")
+        for i, y in enumerate(xrange(5)):
+            print(" %d | %4d | %4d | %4d | %4d | %4d |" % ((y, ) + tuple(M[i])))
+            print("---|------|------|------|------|------|")
+    else:
+        print("Printout for confusion matrix of shape {} is Not Implemented".format(M.shape))
 
 def QWK(y_true, y_pred, K=5):
     """
