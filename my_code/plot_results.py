@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pdb
 
 def plot_results(result_file, max_epoch):
+    result_file_id = result_file.split('-')[0].split('/')[-1]
     f = open(result_file)
     historical_train_losses, historical_val_losses, historical_val_kappas, n_iter_per_epoch = cPickle.load(f)
     n_iter_per_epoch = float(n_iter_per_epoch)
@@ -53,7 +54,7 @@ def plot_results(result_file, max_epoch):
 
     for epoch in learn_rate_reduced_epochs:
         plt.axvline(x=epoch, color='g')
-    plt.title(result_file)
+    plt.title("%s\n%s" % (result_file, result_file_id))
     plt.ylim((-1,1.5))
     if max_epoch:
         plt.xlim((0,max_epoch))

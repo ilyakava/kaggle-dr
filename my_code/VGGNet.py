@@ -324,6 +324,7 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
         print "[ERROR] UnsupportedPredictedClasses {}, saving results".format(e.args[0])
     column.save(runid)
     save_results(runid, [[column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches], [column.learning_rate_decayed_epochs]])
+    print(time.strftime("Finished at %H:%M:%S on %Y-%m-%d"))
 
 if __name__ == '__main__':
     _ = train_args.get()
