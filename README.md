@@ -8,7 +8,7 @@
 
 ### Install General Python deps:
 
-`sudo pip install theano scikit-learn scikit-image nyanbar`
+`sudo pip install theano scikit-learn scikit-image nyanbar natsort`
 
 If `skimage.io` has issues, try: `sudo pop install -U scikit-image`.
 
@@ -50,30 +50,34 @@ device = gpu0
 
 `sudo apt-get install -y p7zip-full graphicsmagick`
 
-### Download & Unpack Data
+### Download & Unpack Data (~45 mins for test)
 
-Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/data?trainLabels.csv.zip) (maybe with w3m), run to unpack:
+Download from [kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/data?trainLabels.csv.zip) (maybe with w3m) and place in `data/train`, to unpack run:
 
-`7z x train.zip.001`
+`7z e -oorig/ train.zip.001`
 
-Place these images into `data/train/orig`
+This will place the images into `data/train/orig`
+
+After placing the test zip files into `data/test` you can run a similar command `7z e -oorig/ test.zip.001` to place the images into `data/test/orig`
 
 Place `trainLabels.csv` into `data/train`
 
 ### Preparing Data for the Network
 
-#### Full Size Originals -> Smaller Originals (~2 hours)
+#### Full Size Originals -> Smaller Originals (~2.3 seconds per image)
 
-(Ex) This will create 3 batchfiles for graphicsmagick to output 256x256 pngs:
+(Ex) This will create 3 batchfiles for graphicsmagick to output 128x128 pngs:
 
 ```
-mkdir data/train/cent_crop_256
-python my_code/create_resize_batchfiles.py data/train/orig/ data/train/cent_crop_256/ 2 256 3
+mkdir data/train/centered_crop
+python my_code/create_resize_batchfiles.py data/train/orig/ data/train/centered_crop/ 2 128 3
 ```
 
 Then follow the on screen directions, which will list what commands to run to process the images cataloged in the generated batchfiles.
 
-#### Alignment (~3 seconds an image)
+Depending on how your CPU schedules, more than 1 batchfile may not result in any speedup (3 is the best size for me however).
+
+#### Alignment (~3 seconds per image)
 
 To reduce noise in the training dataset, detect which images are inverted (taken with an indirect ophthalmoscope) and which are left/right, and invert the images until optic nerve is on the right side of the image.
 
@@ -92,6 +96,10 @@ In three different `screen` sessions for parallel processing. Each will report h
 ### Training the network
 
 `python -m my_code.VGGNet`
+
+### Testing a single network
+
+`python -m my_code.predict`
 
 # Running tests
 

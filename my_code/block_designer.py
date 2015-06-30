@@ -9,7 +9,7 @@ class BlockDesigner(object):
     """
     Serves batches with the same distribution of labels in each batch
     """
-    def __init__(self, source, K=5):
+    def __init__(self, source, K=5, seed=None):
         """
         :type source: string or dict[int->list[str]]
         :param source: name of a csv or the output of a previous BlockDesigner.break_off_block
@@ -22,6 +22,8 @@ class BlockDesigner(object):
         :param proportions: acts as the design for each block that
             BlockDesigner serves
         """
+        if seed:
+            random.seed(seed)
         self.K = K
         self.reservoir = {} # will act as our pool that slowly drains, a source for blocks
         for k in xrange(self.K):

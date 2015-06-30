@@ -27,40 +27,41 @@ import my_code.train_args as train_args
 import pdb
 
 class VGGNet(object):
-    def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad=1, params=None):
-        self.column_params = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, pad]
+    def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape):
+        self.column_init_args = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape]
         layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad)
         print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
         print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
         # data setup
         self.ds = data_stream
+        self.batch_size = batch_size
+        self.n_test_examples = self.ds.n_test_examples
         self.n_train_batches = self.ds.n_train_batches
-        self.n_valid_batches = self.ds.valid_dataset_size // batch_size
-        self.batches_per_cache_block = self.ds.cache_size // batch_size
+        self.n_valid_batches = self.ds.valid_dataset_size // self.batch_size
+        self.batches_per_cache_block = self.ds.cache_size // self.batch_size
         self.num_output_classes = num_output_classes
         self.learning_rate = init_learning_rate
         self.learning_rate_decayed_epochs = []
-
-        self.train_x, self.train_y = self.ds.train_buffer().next()
-        self.train_x = theano.shared(lasagne.utils.floatX(self.train_x))
-        self.train_y = T.cast(theano.shared(self.train_y), 'int32')
-
+        # both train and test are buffered
+        self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
+        self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
+        self.y_buffer = T.cast(theano.shared(self.y_buffer), 'int32')
+        # validation set is not buffered
         valid_x, self.valid_y = self.ds.valid_set()
         valid_x = theano.shared(lasagne.utils.floatX(valid_x))
         self.valid_y = T.cast(theano.shared(self.valid_y), 'int32')
         # network setup
-        all_layers = self.build_model(model_spec, leak_alpha, pad)
+        self.all_layers = self.build_model(model_spec, leak_alpha, pad)
 
         learning_rate = T.fscalar()
         cache_block_index = T.iscalar('cache_block_index')
         X_batch = T.tensor4('x')
         y_batch = T.ivector('y')
-        batch_slice = slice(cache_block_index * batch_size,
-                            (cache_block_index + 1) * batch_size)
+        batch_slice = slice(cache_block_index * self.batch_size, (cache_block_index + 1) * self.batch_size)
 
-        loss_train, loss_valid, pred = self.build_loss_predictions(X_batch, y_batch, all_layers[-1], loss_type)
+        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type)
 
-        self.params = lasagne.layers.get_all_params(all_layers[-1])
+        self.params = lasagne.layers.get_all_params(self.all_layers[-1])
         updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
 
         print("Compiling...")
@@ -69,8 +70,8 @@ class VGGNet(object):
             [cache_block_index, learning_rate], loss_train,
             updates=updates,
             givens={
-                X_batch: self.train_x[batch_slice],
-                y_batch: self.train_y[batch_slice],
+                X_batch: self.x_buffer[batch_slice],
+                y_batch: self.y_buffer[batch_slice],
             },
         )
         self.validate_batch = theano.function(
@@ -78,6 +79,13 @@ class VGGNet(object):
             givens={
                 X_batch: valid_x[batch_slice],
                 y_batch: self.valid_y[batch_slice],
+            },
+        )
+        self.test_batch = theano.function(
+            [cache_block_index],
+            [pred, raw_out],
+            givens={
+                X_batch: self.x_buffer[batch_slice],
             },
         )
 
@@ -101,26 +109,34 @@ class VGGNet(object):
         layer_parameter_counts = [0] + [width*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
         return [layer_input_sizes, layer_parameter_counts]
 
-    def build_loss_predictions(self, X, y, output, loss_type, K=5):
+    def build_target_label_prediction(self, valid_out, loss_type, K):
+        """
+        Picks the target vector for each class, as well as a strategy for
+        picking the predicted label from the network output
+        """
         if re.search('one-hot', loss_type):
             # should be used with softmax out
             identity = numpy.identity(K)
-            pred_valid = T.argmax(lasagne.layers.get_output(output, X, deterministic=True), axis=1)
-            klass_targets = theano.shared(lasagne.utils.floatX(identity))
+            pred_valid = T.argmax(valid_out, axis=1)
+            klass_targets = identity
         elif re.search('nnrank', loss_type):
             # should be used with sigmoid out
             if self.num_output_classes == K:
                 nnrank_target = numpy.tril(numpy.ones((K,K)))
-                pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1) - 1
+                pred_valid = T.sum(T.gt(valid_out, 0.5), axis=1) - 1 # can potentially return -1
             elif self.num_output_classes == (K-1):
                 nnrank_target = numpy.array([[0]*(K-1)] + numpy.tril(numpy.ones((K-1,K-1))).tolist())
                 # TODO check for discontinuities rather than assuming none with the sum
                 # TODO do better than a shared threshold
-                pred_valid = T.sum(T.gt(lasagne.layers.get_output(output, X, deterministic=True), 0.5), axis=1)
-            klass_targets = theano.shared(lasagne.utils.floatX(nnrank_target))
-        target = klass_targets[y]
+                pred_valid = T.sum(T.gt(valid_out, 0.5), axis=1)
+            klass_targets = nnrank_target
+        return(theano.shared(lasagne.utils.floatX((klass_targets))),pred_valid)
+
+    def build_loss_predictions(self, X, y, output, loss_type, K=5):
         train_out = lasagne.layers.get_output(output, X)
         valid_out = lasagne.layers.get_output(output, X, deterministic=True)
+        klass_targets, pred_valid = self.build_target_label_prediction(valid_out, loss_type, K)
+        target = klass_targets[y]
 
         if loss_type == 'one-hot': # requires that y has no more than self.num_output_classes classes
             objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
@@ -141,7 +157,7 @@ class VGGNet(object):
             loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
-        return loss_train, loss_valid, pred_valid
+        return loss_train, loss_valid, pred_valid, valid_out
 
     def build_model(self, model_spec, leak_alpha, pad):
         print("Building model from JSON...")
@@ -202,23 +218,45 @@ class VGGNet(object):
                 raise NotImplementedError()
         return all_layers
 
-    def train_epoch(self):
+    def test(self):
+        """
+        Is responsible for moving the data stream into the column's variables
+        and aggregating test batches
+        :return: predictions (raw probabilities and decision too)
+        """
+        print("Testing...")
+        all_test_predictions = -numpy.ones(self.n_test_examples, dtype=int)
+        all_test_output = -numpy.ones((self.n_test_examples, self.num_output_classes))
+        for x_cache_block, example_idxs in self.ds.test_buffer():
+            self.x_buffer.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
+
+            for i in xrange(self.batches_per_cache_block):
+                batch_slice = slice(i * self.batch_size, (i + 1) * self.batch_size)
+                example_idxs_batch = example_idxs[batch_slice]
+
+                pred, raw_out = self.test_batch(i)
+                all_test_predictions[example_idxs_batch] = pred
+                all_test_output[example_idxs_batch] = raw_out
+        return(all_test_predictions,all_test_output)
+
+    def train_epoch(self, decay_patience, decay_factor, decay_limit):
         """
         Is responsible for moving the data stream into the column's variables
         :return: minibatch training error
         """
         for x_cache_block, y_cache_block in self.ds.train_buffer():
-            self.train_x.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
-            self.train_y.set_value(y_cache_block, borrow=True)
+            self.x_buffer.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
+            self.y_buffer.set_value(y_cache_block, borrow=True)
 
             for i in xrange(self.batches_per_cache_block):
                 batch_loss = self.train_batch(i, self.learning_rate)
                 self.historical_train_losses.append([self.iter, batch_loss])
                 yield batch_loss
+        self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
 
     def decay_learning_rate(self, patience, factor, limit):
         if (len(self.learning_rate_decayed_epochs) < limit and
-            max([0] + self.learning_rate_decayed_epochs) + patience < self.epoch): # also skip first 4 epochs
+            max([0] + self.learning_rate_decayed_epochs) + patience < self.epoch): # also skip first n epochs (n = patience)
 
             val_losses = numpy.array(self.historical_val_losses)
             best_val_loss = min(val_losses[:,1])
@@ -227,7 +265,7 @@ class VGGNet(object):
                 self.learning_rate_decayed_epochs.append(self.epoch)
                 self.learning_rate = self.learning_rate / factor
 
-    def validate(self, decay_patience, decay_factor, decay_limit, silent=False):
+    def validate(self, silent=False):
         """
         Iterates through validation minibatches
         """
@@ -239,7 +277,6 @@ class VGGNet(object):
             valid_predictions.extend(prediction)
         [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions))
         val_loss = numpy.mean(batch_valid_losses)
-        self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
         # housekeeping
         self.historical_val_losses.append([self.iter, val_loss])
         self.historical_val_kappas.append([self.iter, kappa])
@@ -251,7 +288,7 @@ class VGGNet(object):
             print_confusion_matrix(M)
         return [val_loss, kappa]
 
-    def train_column(self, max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch):
+    def train(self, max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch):
         print("Training...")
         start_time = time.clock()
         batch_multiple_to_validate = self.n_train_batches // validations_per_epoch
@@ -263,26 +300,30 @@ class VGGNet(object):
         self.historical_val_kappas = []
         while self.epoch < max_epochs:
             self.epoch += 1
-            for batch_train_loss in self.train_epoch():
+            for batch_train_loss in self.train_epoch(decay_patience, decay_factor, decay_limit):
                 self.iter += 1
                 if (self.iter + 1) % batch_multiple_to_validate == 0:
                     mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(self.iter*60.)
                     print('training @ iter = %i @ %.1fm (ETA %.1fm). Cur training error is %f %%' %
                         (self.iter, ((time.clock() - start_time )/60.), mins_per_epoch*(max_epochs-self.epoch), 100*batch_train_loss))
-                    self.validate(decay_patience, decay_factor, decay_limit)
+                    self.validate()
                     print('     averaging %f mins per epoch' % mins_per_epoch)
 
     def save(self, filename=None):
-        """
-        Will need to load last layer W,b to first layer W,b
-        """
         name = filename or 'CNN_%iLayers_t%i' % (len(self.params) / 2, int(time.time()))
-
         print('Saving Model as "%s"...' % name)
         f = open('./models/'+name+'.pkl', 'wb')
+        cPickle.dump(self.column_init_args, f, -1)
+        for layer in self.all_layers:
+            cPickle.dump(lasagne.layers.get_all_param_values(layer), f, -1)
+        f.close()
 
-        cPickle.dump([param.get_value(borrow=True) for param in self.params], f, -1)
-        cPickle.dump(self.column_params, f, -1)
+    def restore(self, filepath):
+        print("Restoring...")
+        f = open(filepath)
+        cPickle.load(f) # column init args
+        for layer in self.all_layers:
+            lasagne.layers.set_all_param_values(layer, cPickle.load(f))
         f.close()
 
 def save_results(filename, multi_params):
@@ -293,29 +334,31 @@ def save_results(filename, multi_params):
         cPickle.dump(params, f, -1)
     f.close()
 
-def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
-                 batch_size, leak_alpha, center, normalize, amplify,
-                 as_grey, num_output_classes, decay_patience, decay_factor,
-                 decay_limit, loss_type, validations_per_epoch, train_flip, shuffle):
-    runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
-    print("[INFO] Starting runid %s" % runid)
-
+def load_model_specs(network, as_grey):
     with open('network_specs.json') as data_file:
         network = json.load(data_file)[network]
         netspec = network['layers']
         pad = network['pad']
         input_image_size = network['rec_input_size']
-
     input_image_channels = 1 if as_grey else 3
-
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
+    return(model_spec, image_shape, pad)
 
-    data_stream = DataStream(image_dir=dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle)
+def init_and_train(network, init_learning_rate, momentum, max_epochs, train_dataset,
+                 batch_size, leak_alpha, center, normalize, amplify,
+                 as_grey, num_output_classes, decay_patience, decay_factor,
+                 decay_limit, loss_type, validations_per_epoch, train_flip,
+                 shuffle, test_dataset, random_seed, valid_dataset_size):
+    runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
+    print("[INFO] Starting runid %s" % runid)
 
-    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad)
+    model_spec, image_shape, pad = load_model_specs(network, as_grey)
+
+    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
+    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
     try:
-        column.train_column(max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch)
+        column.train(max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     except UnsupportedPredictedClasses as e:
@@ -327,11 +370,11 @@ def train_drnet(network, init_learning_rate, momentum, max_epochs, dataset,
 if __name__ == '__main__':
     _ = train_args.get()
 
-    train_drnet(network=_.network,
+    init_and_train(network=_.network,
                 init_learning_rate=_.learning_rate,
                 momentum=_.momentum,
                 max_epochs=_.max_epochs,
-                dataset=_.dataset,
+                train_dataset=_.train_dataset,
                 batch_size=_.batch_size,
                 leak_alpha=_.alpha,
                 center=_.center,
@@ -345,4 +388,7 @@ if __name__ == '__main__':
                 loss_type=_.loss_type,
                 validations_per_epoch=_.validations_per_epoch,
                 train_flip=_.train_flip,
-                shuffle=_.shuffle)
+                shuffle=_.shuffle,
+                test_dataset=_.test_dataset,
+                random_seed=_.random_seed,
+                valid_dataset_size=_.valid_dataset_size)

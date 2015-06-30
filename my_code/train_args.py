@@ -8,7 +8,7 @@ def get():
                         type=str,
                         default="vgg_mini7b_leak_sig")
     parser.add_argument("-d",
-                        "--dataset",
+                        "--train-dataset",
                         type=str,
                         default="data/train/centered_crop/")
     parser.add_argument("-b",
@@ -51,7 +51,7 @@ def get():
     parser.add_argument("-o",
                         "--output-classes",
                         type=int,
-                        default=5,
+                        default=4,
                         help="num_units in the network OUTPUT layer.")
     parser.add_argument("-p",
                         "--decay-patience",
@@ -85,12 +85,26 @@ def get():
     parser.add_argument("-F",
                         "--train-flip",
                         type=str,
-                        default='no_flip',
+                        default='rand_flip',
                         help="Method name or csv file that contains complete information on whether to flip a given training image.")
     parser.add_argument("-s",
                         "--shuffle",
                         type=int,
                         default=0,
                         help="1 to shuffle training set every epoch, 0 to use the same ordering")
+    parser.add_argument("-D",
+                        "--test-dataset",
+                        type=str,
+                        default=None)
+    parser.add_argument("-r",
+                        "--random-seed",
+                        type=int,
+                        default=1991,
+                        help="Make validation set selection reproducible")
+    parser.add_argument("-v",
+                        "--valid-dataset-size",
+                        type=int,
+                        default=4864,
+                        help="Validation set size (4864=14%, 3456=10%, 1664=5%)")
 
     return parser.parse_args()

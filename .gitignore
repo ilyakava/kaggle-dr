@@ -8,3 +8,4 @@ data/*
 *.pkl
 *.png
 *.gz
+*.csv
