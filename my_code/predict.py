@@ -9,7 +9,10 @@ import my_code.test_args as test_args
 
 import pdb
 
-def save(runid, img_names, labels):
+def save_prediction(runid, img_names, labels):
+    """
+    Saves a csv for kaggle in the same format as the training Labels
+    """
     assert(len(img_names) == len(labels))
     outfile = "results/%s.csv" % runid
     print("Writing results to %s" % outfile)
@@ -34,7 +37,7 @@ def single(model_file, train_dataset, center, normalize, train_flip,
     column.restore(model_file)
     try:
         all_test_predictions, all_test_output = column.test()
-        save(runid, data_stream.test_dataset['X'], all_test_predictions)
+        save_prediction(runid, data_stream.test_dataset['X'], all_test_predictions)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Testing"
     print(time.strftime("Finished at %H:%M:%S on %Y-%m-%d"))

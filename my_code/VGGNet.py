@@ -314,16 +314,20 @@ class VGGNet(object):
         print('Saving Model as "%s"...' % name)
         f = open('./models/'+name+'.pkl', 'wb')
         cPickle.dump(self.column_init_args, f, -1)
-        for layer in self.all_layers:
-            cPickle.dump(lasagne.layers.get_all_param_values(layer), f, -1)
+        # only need to save last layer params to restore them later
+        cPickle.dump(lasagne.layers.get_all_param_values(self.all_layers[-1]), f, -1)
         f.close()
 
     def restore(self, filepath):
         print("Restoring...")
         f = open(filepath)
-        cPickle.load(f) # column init args
-        for layer in self.all_layers:
-            lasagne.layers.set_all_param_values(layer, cPickle.load(f))
+        all_saves = []
+        while True:
+            try:
+                all_saves.append(cPickle.load(f))
+            except EOFError:
+                break
+        lasagne.layers.set_all_param_values(self.all_layers[-1], all_saves[-1])
         f.close()
 
 def save_results(filename, multi_params):
