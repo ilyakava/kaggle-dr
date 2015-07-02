@@ -28,10 +28,10 @@ def get():
                         default='no_flip',
                         help="Method name or csv file that contains complete information on whether to flip a given training image.")
     parser.add_argument("-D",
-                        "--test-dataset",
+                        "--test-path",
                         type=str,
                         default=None,
-                        help="A directory with test images.")
+                        help="Either a path to an image file (with extension) or directory of images.")
     parser.add_argument("-r",
                         "--random-seed",
                         type=int,
@@ -42,5 +42,9 @@ def get():
                         type=int,
                         default=1664,
                         help="Validation set size (4864=14%, 3456=10%, 1664=5%)")
+    parser.add_argument("-p",
+                        "--patch-size",
+                        type=int,
+                        default=11)
 
     return parser.parse_args()

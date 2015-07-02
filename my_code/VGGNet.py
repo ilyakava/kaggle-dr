@@ -218,16 +218,18 @@ class VGGNet(object):
                 raise NotImplementedError()
         return all_layers
 
-    def test(self):
+    def test(self, override_buffer=None, override_num_examples=None):
         """
         Is responsible for moving the data stream into the column's variables
         and aggregating test batches
         :return: predictions (raw probabilities and decision too)
         """
+        test_buffer = override_buffer or self.ds.test_buffer
+        n_test_examples = override_num_examples or self.n_test_examples
         print("Testing...")
-        all_test_predictions = -numpy.ones(self.n_test_examples, dtype=int)
-        all_test_output = -numpy.ones((self.n_test_examples, self.num_output_classes))
-        for x_cache_block, example_idxs in self.ds.test_buffer():
+        all_test_predictions = -numpy.ones(n_test_examples, dtype=int)
+        all_test_output = -numpy.ones((n_test_examples, self.num_output_classes))
+        for x_cache_block, example_idxs in test_buffer():
             self.x_buffer.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
 
             for i in xrange(self.batches_per_cache_block):

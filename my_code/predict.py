@@ -22,12 +22,12 @@ def save_prediction(runid, img_names, labels):
         for i in xrange(len(img_names)):
             writer.writerow([img_names[i],labels[i]])
 
-def single(model_file, train_dataset, center, normalize, train_flip,
-           test_dataset, random_seed, valid_dataset_size):
-    assert(model_file)
-    runid = path.splitext(path.basename(model_file))[0]
-    print("[INFO] Starting prediction for %s" % runid)
+def model_runid(model_file):
+    return path.splitext(path.basename(model_file))[0].split('-')[0]
 
+def load_column(model_file, train_dataset, center, normalize, train_flip,
+                test_dataset, random_seed, valid_dataset_size):
+    print("Loading...")
     f = open(model_file)
     batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
     f.close()
@@ -35,9 +35,16 @@ def single(model_file, train_dataset, center, normalize, train_flip,
     data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, train_flip=train_flip, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
     column.restore(model_file)
+    return column
+
+def single(model_file, **kwargs):
+    assert(model_file)
+    runid = model_runid(model_file)
+
+    column = load_column(model_file, **kwargs)
     try:
         all_test_predictions, all_test_output = column.test()
-        save_prediction(runid, data_stream.test_dataset['X'], all_test_predictions)
+        save_prediction(runid, column.ds.test_dataset['X'], all_test_predictions)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Testing"
     print(time.strftime("Finished at %H:%M:%S on %Y-%m-%d"))

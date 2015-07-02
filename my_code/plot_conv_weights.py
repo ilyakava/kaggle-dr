@@ -7,6 +7,8 @@ import numpy
 from PIL import Image
 import scipy.misc
 
+from my_code.predict import model_runid
+
 import pdb
 
 def conv_weight_image(W,b, filter_enlargement=2, filter_padding=1):
@@ -36,7 +38,7 @@ def conv_weight_image(W,b, filter_enlargement=2, filter_padding=1):
 
 if __name__ == '__main__':
     model_file = sys.argv[1]
-    runid = path.splitext(path.basename(model_file))[0].split('-')[0]
+    runid = model_runid(model_file)
     f = open(model_file)
     # discard first slot
     all_saves = []
