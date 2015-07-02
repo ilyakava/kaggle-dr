@@ -22,6 +22,16 @@ def print_confusion_matrix(M):
     else:
         print("Printout for confusion matrix of shape {} is Not Implemented".format(M.shape))
 
+def confusion_matrix_kappa(M,K):
+    dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
+    dy = dx.transpose()
+    d = (dx - dy)**2 / (K-1)**2
+    col_sum = M.sum(axis=0)
+    row_sum = M.sum(axis=1)
+    E = row_sum.reshape((K,1)).dot(col_sum.reshape((1,K))) / float(M.sum())
+    score = 1 - ((d*M).sum()/M.sum()) / ((d*E).sum() / E.sum())
+    return score
+
 def QWK(y_true, y_pred, K=5):
     """
     Quadratic mean weighted kappa
@@ -30,16 +40,7 @@ def QWK(y_true, y_pred, K=5):
     """
     assert_valid_prediction(y_pred, K)
     M = confusion_matrix(y_true, y_pred, labels=list(range(K)))
-    dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
-    dy = dx.transpose()
-    d = (dx - dy)**2 / (K-1)**2
-    col_sum = M.sum(axis=0)
-    row_sum = M.sum(axis=1)
-    E = row_sum.reshape((K,1)).dot(col_sum.reshape((1,K))) / float(M.sum())
-    Ef = E.flatten()
-    Mf = M.flatten()
-    df = d.flatten()
-    score = 1 - (sum(df * Mf)/sum(Mf)) / (sum(df * Ef) / sum(Ef))
+    score = confusion_matrix_kappa(M,K)
     return [score, M]
 
 def binary_accuracy_precision(true_labels, predicted_labels):
