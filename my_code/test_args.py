@@ -27,6 +27,10 @@ def get():
                         type=str,
                         default='no_flip',
                         help="Method name or csv file that contains complete information on whether to flip a given training image.")
+    parser.add_argument("-F3",
+                        "--test-flip",
+                        type=str,
+                        default='no_flip')
     parser.add_argument("-D",
                         "--test-dataset",
                         type=str,

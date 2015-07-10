@@ -8,6 +8,7 @@ import collections
 import uuid
 import json
 import re
+from math import exp
 import cPickle
 import numpy
 # Deep Learning
@@ -42,6 +43,7 @@ class VGGNet(object):
         self.num_output_classes = num_output_classes
         self.learning_rate = init_learning_rate
         self.learning_rate_decayed_epochs = []
+        self.flip_noise = 1
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
@@ -241,20 +243,26 @@ class VGGNet(object):
                 all_test_output[example_idxs_batch] = raw_out
         return(all_test_predictions,all_test_output)
 
-    def train_epoch(self, decay_patience, decay_factor, decay_limit):
+    def train_epoch(self, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity):
         """
         Is responsible for moving the data stream into the column's variables
+        Since it mutates the network's weights, the state of the column's
+        epoch/iter are updated here as well.
+
         :return: minibatch training error
         """
-        for x_cache_block, y_cache_block in self.ds.train_buffer():
+        self.epoch += 1
+        self.decay_flip_noise(noise_decay_start, noise_decay_duration, noise_decay_severity)
+        self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
+        for x_cache_block, y_cache_block in self.ds.train_buffer(self.flip_noise):
             self.x_buffer.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
             self.y_buffer.set_value(y_cache_block, borrow=True)
 
             for i in xrange(self.batches_per_cache_block):
+                self.iter += 1
                 batch_loss = self.train_batch(i, self.learning_rate)
                 self.historical_train_losses.append([self.iter, batch_loss])
                 yield batch_loss
-        self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
 
     def decay_learning_rate(self, patience, factor, limit):
         if (len(self.learning_rate_decayed_epochs) < limit and
@@ -266,6 +274,18 @@ class VGGNet(object):
             if sum(last_val_losses > best_val_loss) == patience:
                 self.learning_rate_decayed_epochs.append(self.epoch)
                 self.learning_rate = self.learning_rate / factor
+
+    def decay_flip_noise(self, noise_decay_start, noise_decay_duration, noise_decay_severity):
+        if (noise_decay_start > 0): # decay noise at a specific time
+            schedule = [exp(1)**(-(x*noise_decay_severity)/float(noise_decay_duration)) for x in range(noise_decay_duration)]
+            sched_idx = max(0, self.epoch - noise_decay_start)
+            if (sched_idx < len(schedule)):
+                self.flip_noise = schedule[sched_idx]
+            else:
+                self.flip_noise = 0
+        else:
+            # TODO could start decaying flip noise when val loss plateaus
+            raise NotImplementedError()
 
     def validate(self, silent=False):
         """
@@ -290,7 +310,7 @@ class VGGNet(object):
             print_confusion_matrix(M)
         return [val_loss, kappa]
 
-    def train(self, max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch):
+    def train(self, max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch):
         print("Training...")
         start_time = time.clock()
         batch_multiple_to_validate = self.n_train_batches // validations_per_epoch
@@ -301,9 +321,7 @@ class VGGNet(object):
         self.historical_val_losses = []
         self.historical_val_kappas = []
         while self.epoch < max_epochs:
-            self.epoch += 1
-            for batch_train_loss in self.train_epoch(decay_patience, decay_factor, decay_limit):
-                self.iter += 1
+            for batch_train_loss in self.train_epoch(decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity):
                 if (self.iter + 1) % batch_multiple_to_validate == 0:
                     mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(self.iter*60.)
                     print('training @ iter = %i @ %.1fm (ETA %.1fm). Cur training error is %f %%' %
@@ -355,16 +373,17 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  batch_size, leak_alpha, center, normalize, amplify,
                  as_grey, num_output_classes, decay_patience, decay_factor,
                  decay_limit, loss_type, validations_per_epoch, train_flip,
-                 shuffle, test_dataset, random_seed, valid_dataset_size):
+                 shuffle, test_dataset, random_seed, valid_dataset_size,
+                 noise_decay_start, noise_decay_duration, noise_decay_severity, valid_flip, test_flip):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
     model_spec, image_shape, pad = load_model_specs(network, as_grey)
 
-    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
+    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip)
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
     try:
-        column.train(max_epochs, decay_patience, decay_factor, decay_limit, validations_per_epoch)
+        column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     except UnsupportedPredictedClasses as e:
@@ -397,4 +416,9 @@ if __name__ == '__main__':
                 shuffle=_.shuffle,
                 test_dataset=_.test_dataset,
                 random_seed=_.random_seed,
-                valid_dataset_size=_.valid_dataset_size)
+                valid_dataset_size=_.valid_dataset_size,
+                noise_decay_start=_.noise_decay_start,
+                noise_decay_duration=_.noise_decay_duration,
+                noise_decay_severity=_.noise_decay_severity,
+                valid_flip=_.valid_flip,
+                test_flip=_.test_flip)

@@ -1,5 +1,7 @@
 import argparse
 
+LONG_TIME = 9999
+
 def get():
     parser = argparse.ArgumentParser()
 
@@ -56,7 +58,7 @@ def get():
     parser.add_argument("-p",
                         "--decay-patience",
                         type=int,
-                        default=9999,
+                        default=LONG_TIME,
                         help="Number epochs of worse than best validation performance to wait before decaying leaning rate by --decay-factor")
     parser.add_argument("-f",
                         "--decay-factor",
@@ -86,7 +88,15 @@ def get():
                         "--train-flip",
                         type=str,
                         default='rand_flip',
-                        help="Method name or csv file that contains complete information on whether to flip a given training image.")
+                        help="Method name or csv file (aligned flips) that contains complete information on whether to flip a given training image.")
+    parser.add_argument("-F2",
+                        "--valid-flip",
+                        type=str,
+                        default='no_flip')
+    parser.add_argument("-F3",
+                        "--test-flip",
+                        type=str,
+                        default='no_flip')
     parser.add_argument("-s",
                         "--shuffle",
                         type=int,
@@ -106,5 +116,20 @@ def get():
                         type=int,
                         default=4864,
                         help="Validation set size (4864=14%, 3456=10%, 1664=5%)")
+    parser.add_argument("-t",
+                        "--noise-decay-start",
+                        type=int,
+                        default=LONG_TIME,
+                        help="This is relevant only when random flips should transition into aligned flips.")
+    parser.add_argument("-u",
+                        "--noise-decay-duration",
+                        type=int,
+                        default=50,
+                        help="Pass 0 for this option (in conjunction with: '-F *.csv') for flips from csv with no noise. This is relevant only when random flips should transition into aligned flips.")
+    parser.add_argument("-y",
+                        "--noise-decay-severity",
+                        type=float,
+                        default=5,
+                        help="e ** (n/ (--noise-decay-duration / --noise-decay-severity)) is the noise at n. This is relevant only when random flips should transition into aligned flips.")
 
     return parser.parse_args()

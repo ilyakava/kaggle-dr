@@ -11,36 +11,59 @@ from block_designer import BlockDesigner
 
 import pdb
 
-def no_flip(image_name):
-    return [0,0]
+class ImageFlipOracle(object):
+    """
+    *_flip methods should take an image_name
+    """
+    def __init__(self, flip_mode):
+        self.noise = 0
+        if re.search('\.csv', flip_mode):
+            self.image_name_to_flip_coord = {}
+            with open(flip_mode, 'rb') as csvfile:
+                reader = csv.reader(csvfile)
+                next(reader, None)
+                for row in reader:
+                    image_name = row[0]
+                    flip_coords = [int(row[1]), int(row[2])]
+                    self.image_name_to_flip_coord[image_name] = flip_coords
 
-def rand_flip(image_name):
-    return [int(round(random.random())), int(round(random.random()))]
+    def get_flip_lambda(self, flip_mode, deterministic=False):
+        if re.search('\.csv', flip_mode):
+            if deterministic:
+                return self.align_flip
+            else:
+                return self.noisy_align_flip
+        else:
+            return {
+                "no_flip": self.no_flip,
+                "rand_flip": self.rand_flip,
+                "align_flip": self.align_flip,
+                "noisy_align_flip": self.noisy_align_flip
+            }[flip_mode]
 
-def get_train_flip_lambda(lambda_or_file_name):
-    flip_lambdas = {
-        "no_flip": no_flip,
-        "rand_flip": rand_flip
-    }
-    if flip_lambdas.get(lambda_or_file_name):
-        return flip_lambdas[lambda_or_file_name]
-    else:
-        image_name_to_flip_coord = {}
-        with open(lambda_or_file_name, 'rb') as csvfile:
-            reader = csv.reader(csvfile)
-            next(reader, None)
-            for row in reader:
-                image_name = row[0]
-                flip_coords = [int(row[1]), int(row[2])]
-                image_name_to_flip_coord[image_name] = flip_coords
-        def predetermined_flip(image_name):
-            return image_name_to_flip_coord[image_name]
-        return predetermined_flip
+    def no_flip(self, image_name):
+        return numpy.array([0,0])
 
-def get_train_val_flip_lambda(lambda_or_file_name):
-    train = get_train_flip_lambda(lambda_or_file_name)
-    val = train if re.search('\.csv', lambda_or_file_name) else no_flip
-    return(train,val)
+    def rand_flip(self, image_name):
+        return numpy.array([int(round(random.random())), int(round(random.random()))])
+
+    def align_flip(self, image_name):
+        return numpy.array(self.image_name_to_flip_coord[image_name])
+
+    def noisy_align_flip(self, image_name):
+        """
+        :param noise: float (0,1) where 1 is fully noise and 0 is
+            fully deterministic. If greater than 0, predetermined correct flips
+            will be swapped with a random flip with Pr(noise)
+        """
+        if random.random() < self.noise:
+            return ((self.align_flip(image_name) + self.rand_flip(image_name)) % 2)
+        else:
+            return self.align_flip(image_name)
+
+    def reset_noise(self, level):
+        assert(level >= 0 and level <= 1)
+        self.noise = level
 
 TRAIN_LABELS_CSV_PATH = "data/train/trainLabels.csv"
 
@@ -60,7 +83,9 @@ class DataStream(object):
                  shuffle=1,
                  test_image_dir=None,
                  random_seed=None,
-                 valid_dataset_size=4864):
+                 valid_dataset_size=4864,
+                 valid_flip='no_flip',
+                 test_flip='no_flip'):
         self.train_image_dir = train_image_dir
         self.test_image_dir = test_image_dir
         self.image_shape = image_shape
@@ -71,7 +96,11 @@ class DataStream(object):
         self.normalize = normalize
         self.std = None
         self.amplify = amplify
-        self.train_flip_lambda, self.val_flip_lambda = get_train_val_flip_lambda(train_flip)
+        self.train_set_flipper = ImageFlipOracle(train_flip)
+        test_set_flipper = ImageFlipOracle(test_flip)
+        self.train_flip_lambda = self.train_set_flipper.get_flip_lambda(train_flip)
+        self.valid_flip_lambda = self.train_set_flipper.get_flip_lambda(valid_flip, deterministic=True)
+        self.test_flip_lambda = test_set_flipper.get_flip_lambda(test_flip, deterministic=True)
         self.valid_dataset_size = valid_dataset_size
 
         bd = BlockDesigner(TRAIN_LABELS_CSV_PATH, seed=random_seed)
@@ -92,13 +121,15 @@ class DataStream(object):
     def valid_set(self):
         all_val_images = numpy.zeros(((len(self.valid_dataset["y"]),) + self.image_shape), dtype=theano.config.floatX)
         for i, image in enumerate(self.valid_dataset["X"]):
-            all_val_images[i, ...] = self.feed_image(image, self.train_image_dir, self.val_flip_lambda) # b01c, Theano: bc01 CudaConvnet: c01b
+            all_val_images[i, ...] = self.feed_image(image, self.train_image_dir, self.valid_flip_lambda) # b01c, Theano: bc01 CudaConvnet: c01b
         return numpy.rollaxis(all_val_images, 3, 1), numpy.array(self.valid_dataset["y"], dtype='int32')
 
-    def train_buffer(self):
+    def train_buffer(self, new_flip_noise=None):
         """
         Yields a x_cache_block, has a size that is a multiple of training batches
         """
+        if new_flip_noise:
+            self.train_set_flipper.reset_noise(new_flip_noise)
         train_dataset = self.train_dataset or self.setup_train_dataset()
         x_cache_block = numpy.zeros(((self.cache_size,) + self.image_shape), dtype=theano.config.floatX)
         n_cache_blocks = int(len(train_dataset["y"]) / float(self.cache_size)) # rounding down skips the leftovers
@@ -124,14 +155,14 @@ class DataStream(object):
             ith_cache_block_slice = slice(ith_cache_block * self.cache_size, ith_cache_block_end)
             idxs_to_full_dataset = list(range(ith_cache_block * self.cache_size, ith_cache_block_end))
             for i, image in enumerate(self.test_dataset["X"][ith_cache_block_slice]):
-                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.val_flip_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
         # sneak the leftovers out, padded by the previous full cache block
         if n_leftovers:
             leftover_slice = slice(ith_cache_block_end, ith_cache_block_end + n_leftovers)
             for i, image in enumerate(self.test_dataset["X"][leftover_slice]):
                 idxs_to_full_dataset[i] = ith_cache_block_end + i
-                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.val_flip_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
 
     def read_image(self, image_name, image_dir, extension=".png"):
@@ -155,13 +186,16 @@ class DataStream(object):
         return self.amplify * image
 
     def flip_image(self, image, flip_coords):
+        assert(len(flip_coords) == 2)
+        assert(max(flip_coords) <= 1)
+        assert(min(flip_coords) >= 0)
         if flip_coords[0] == 1:
             image = numpy.flipud(image)
         if flip_coords[1] == 1:
             image = numpy.fliplr(image)
         return image
 
-    def feed_image(self, image_name, image_dir, flip_lambda=no_flip):
+    def feed_image(self, image_name, image_dir, flip_lambda):
         img = self.read_image(image_name, image_dir)
         flip_coords = flip_lambda(image_name)
         return self.preprocess_image(img, flip_coords)
