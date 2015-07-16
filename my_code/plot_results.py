@@ -2,10 +2,11 @@ import sys
 import cPickle
 import numpy
 import matplotlib.pyplot as plt
+import argparse
 
 import pdb
 
-def plot_results(result_file, max_epoch):
+def plot_results(result_file, max_epoch, include_training_variance):
     result_file_id = result_file.split('-')[0].split('/')[-1]
     f = open(result_file)
     historical_train_losses, historical_val_losses, historical_val_kappas, n_iter_per_epoch = cPickle.load(f)
@@ -35,6 +36,16 @@ def plot_results(result_file, max_epoch):
     plt.plot(kappa[:,0], kappa[:,1], 'b', label="Validation Kappa")
     plt.xlabel("Epochs. Decays at: {}".format(learn_rate_reduced_epochs))
 
+    if include_training_variance:
+        errors_by_epoch = {}
+        for idx, epoch in enumerate([int(itr) for itr in train[:,0]]):
+            if not errors_by_epoch.get(epoch):
+                errors_by_epoch[epoch] = []
+            errors_by_epoch[epoch].append(train[:,1][idx])
+        training_epochs = list(range(1, len(errors_by_epoch))) # skip very first epoch b/c of super-high variance
+        training_variances = numpy.array([numpy.var(errors_by_epoch[epoch]) for epoch in training_epochs])
+        plt.plot(training_epochs, (training_variances / max(training_variances)), 'black', label="Rescaled Training Variances")
+
     best_valy_idx, best_valy = min(enumerate(valid[:,1]), key=lambda p: p[1])
     best_valx = valid[best_valy_idx, 0]
 
@@ -56,14 +67,29 @@ def plot_results(result_file, max_epoch):
         plt.axvline(x=epoch, color='g')
     plt.title("%s\n%s" % (result_file, result_file_id))
     plt.ylim((-1,1.5))
+
     if max_epoch:
         plt.xlim((0,max_epoch))
     else:
         plt.xlim((0,len(train[:,1]) / n_iter_per_epoch))
+
     plt.legend(loc=3)
     plt.grid()
     plt.show()
 
 if __name__ == '__main__':
-    max_epoch = float(sys.argv[2]) if len(sys.argv) > 2 else None
-    plot_results(sys.argv[1], max_epoch)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f",
+                        "--result-file",
+                        type=str,
+                        default=None)
+    parser.add_argument("-m",
+                        "--max-epoch",
+                        type=float,
+                        default=None)
+    parser.add_argument("-v",
+                        "--include-training-variance",
+                        type=bool,
+                        default=False)
+    _ = parser.parse_args()
+    plot_results(_.result_file, _.max_epoch, _.include_training_variance)
