@@ -399,13 +399,14 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  as_grey, num_output_classes, decay_patience, decay_factor,
                  decay_limit, loss_type, validations_per_epoch, train_flip,
                  shuffle, test_dataset, random_seed, valid_dataset_size,
-                 noise_decay_start, noise_decay_duration, noise_decay_severity, valid_flip, test_flip):
+                 noise_decay_start, noise_decay_duration, noise_decay_severity,
+                 valid_flip, test_flip, uniform_sample_class):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
 
     model_spec, image_shape, pad = load_model_specs(network, as_grey)
 
-    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip)
+    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, uniform_sample_class=uniform_sample_class)
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
     try:
         column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
@@ -446,4 +447,5 @@ if __name__ == '__main__':
                 noise_decay_duration=_.noise_decay_duration,
                 noise_decay_severity=_.noise_decay_severity,
                 valid_flip=_.valid_flip,
-                test_flip=_.test_flip)
+                test_flip=_.test_flip,
+                uniform_sample_class=_.uniform_sample_class)

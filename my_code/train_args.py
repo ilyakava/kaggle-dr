@@ -131,5 +131,10 @@ def get():
                         type=float,
                         default=5,
                         help="e ** (n/ (--noise-decay-duration / --noise-decay-severity)) is the noise at n. This is relevant only when random flips should transition into aligned flips.")
+    parser.add_argument("-U",
+                        "--uniform-sample-class",
+                        type=int,
+                        default=None,
+                        help="Instead of runing through all of the data in whatever distribution it lies in, make each batch have a uniform class distribution by running through a single class's data while over/undersampling other classes' data. For the following choices for '-U', multiply '-x' by: 0: 0.276,  1: 2.95,  2: 1.35 , 3: 8.07,  4: 9.80, to get the same runtime")
 
     return parser.parse_args()

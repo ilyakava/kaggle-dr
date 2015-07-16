@@ -8,6 +8,7 @@ import theano
 from skimage.io import imread
 
 from block_designer import BlockDesigner
+from sampler import Sampler
 
 import pdb
 
@@ -85,7 +86,8 @@ class DataStream(object):
                  random_seed=None,
                  valid_dataset_size=4864,
                  valid_flip='no_flip',
-                 test_flip='no_flip'):
+                 test_flip='no_flip',
+                 uniform_sample_class=None):
         self.train_image_dir = train_image_dir
         self.test_image_dir = test_image_dir
         self.image_shape = image_shape
@@ -102,18 +104,21 @@ class DataStream(object):
         self.valid_flip_lambda = self.train_set_flipper.get_flip_lambda(valid_flip, deterministic=True)
         self.test_flip_lambda = test_set_flipper.get_flip_lambda(test_flip, deterministic=True)
         self.valid_dataset_size = valid_dataset_size
+        self.random_seed = random_seed
+        self.uniform_sample_class = uniform_sample_class
 
-        bd = BlockDesigner(TRAIN_LABELS_CSV_PATH, seed=random_seed)
+        bd = BlockDesigner(TRAIN_LABELS_CSV_PATH, seed=self.random_seed)
 
         valid_examples = bd.break_off_block(self.valid_dataset_size)
         self.train_examples = bd.remainder()
-        self.n_train_batches = int(bd.size() / self.batch_size)
-        self.train_dataset_size = self.n_train_batches * self.batch_size
 
         self.valid_dataset = self.setup_valid_dataset(valid_examples)
         self.train_dataset = None if shuffle else self.setup_train_dataset()
         self.test_dataset = self.setup_test_dataset()
         self.n_test_examples = len(self.test_dataset["X"])
+
+        self.n_train_batches = int(len(self.train_dataset["X"]) / self.batch_size) if self.train_dataset else int(bd.size() / self.batch_size) # TODO fix this paper-cut 'if else'
+        self.train_dataset_size = self.n_train_batches * self.batch_size
 
         if self.center == 1 or self.normalize == 1:
             self.calc_mean_std_image()
@@ -231,15 +236,20 @@ class DataStream(object):
         Each self.batch_size of examples follows the same distribution
         """
         bd = BlockDesigner(self.train_examples)
-        blocks = bd.break_off_multiple_blocks(self.n_train_batches, self.batch_size)
-        images = []
-        labels = []
-        for block in blocks:
-            for y, ids in block.items():
-                for id in ids:
-                    images.append(id)
-                    labels.append(y)
-        return {"X": images, "y": labels}
+        if self.uniform_sample_class:
+            samp = Sampler(bd.remainder(), seed=self.random_seed)
+            images, labels = samp.uniform_full_sample_class(self.uniform_sample_class, self.batch_size)
+            return {"X": images, "y": labels}
+        else:
+            blocks = bd.break_off_multiple_blocks(self.n_train_batches, self.batch_size)
+            images = []
+            labels = []
+            for block in blocks:
+                for y, ids in block.items():
+                    for id in ids:
+                        images.append(id)
+                        labels.append(y)
+            return {"X": images, "y": labels}
 
     def setup_test_dataset(self):
         if self.test_image_dir:

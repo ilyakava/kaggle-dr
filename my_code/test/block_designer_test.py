@@ -11,25 +11,27 @@ import pdb
 PROPORTION_ERROR_MARGIN = 0.01 # 1 percent
 SAMPLE_COUNT_ERROR_MARGIN = 5 # misplaced samples
 
+def create_skewed_CSV():
+    populations = [25810, 2443, 5292, 873, 708] # actual DR proportions in descending classes
+    K = len(populations)
+    proportions = [(populations[klass] / float(sum(populations))) for klass in reversed(xrange(K))]
+    id = 0
+    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
+    with tmp as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['image','level'])
+        for klass, population in enumerate(populations):
+            for _ in xrange(population):
+                id += 1
+                writer.writerow(['%s_%i' % (str(uuid.uuid4())[:8], id), klass])
+    return(tmp.name, numpy.array(proportions))
+
 class CreateTrainValTestSet(unittest.TestCase):
 
     def setUp(self):
-        self.bd, self.true_proportions = self.create_skewed_CSV()
-
-    def create_skewed_CSV(self):
-        populations = [25810, 2443, 5292, 873, 708] # actual DR proportions in descending classes
-        self.K = len(populations)
-        proportions = [(populations[klass] / float(sum(populations))) for klass in reversed(xrange(self.K))]
-        id = 0
-        tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-        with tmp as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(['image','level'])
-            for klass, population in enumerate(populations):
-                for _ in xrange(population):
-                    id += 1
-                    writer.writerow(['%s_%i' % (str(uuid.uuid4())[:8], id), klass])
-        return BlockDesigner(tmp.name, self.K), numpy.array(proportions)
+        f, self.true_proportions = create_skewed_CSV()
+        self.K = len(self.true_proportions)
+        self.bd = BlockDesigner(f, self.K)
 
     def get_proportions(self, dataset):
         return numpy.array([len(dataset[klass])/(len(numpy.concatenate(dataset.values()).flatten()) + numpy.spacing(1)) for klass in reversed(xrange(self.K))])
