@@ -111,13 +111,14 @@ class DataStream(object):
 
         valid_examples = bd.break_off_block(self.valid_dataset_size)
         self.train_examples = bd.remainder()
+        self.n_train_batches = int(bd.size() / self.batch_size)
 
         self.valid_dataset = self.setup_valid_dataset(valid_examples)
         self.train_dataset = None if shuffle else self.setup_train_dataset()
         self.test_dataset = self.setup_test_dataset()
         self.n_test_examples = len(self.test_dataset["X"])
 
-        self.n_train_batches = int(len(self.train_dataset["X"]) / self.batch_size) if self.train_dataset else int(bd.size() / self.batch_size) # TODO fix this paper-cut 'if else'
+        self.n_train_batches = int(len(self.train_dataset["X"]) / self.batch_size) # override in case Sampler is used (TODO make this neater)
         self.train_dataset_size = self.n_train_batches * self.batch_size
 
         if self.center == 1 or self.normalize == 1:
