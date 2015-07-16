@@ -144,19 +144,44 @@ class VGGNet(object):
             objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
             loss_train = objective.get_loss(X, target=y)
             loss_valid = objective.get_loss(X, target=y, deterministic=True)
-        elif (loss_type == 'one-hot-ce') and (self.num_output_classes == K):
+        elif (loss_type == 'one-hot-ce') and (self.num_output_classes == K): # cross entropy
             # manual version of one-hot, totally equivalent (in theory and practice)
             loss_train = -T.mean(T.sum(target*T.log(train_out), axis=1))
             loss_valid = -T.mean(T.sum(target*T.log(valid_out), axis=1))
-        elif (loss_type == 'one-hot-re') and (self.num_output_classes == K):
+        elif (loss_type == 'one-hot-re') and (self.num_output_classes == K): # relative entropy
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
             loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
-        elif loss_type == 'nnrank-mse':
+        elif loss_type == 'nnrank-mse': # mean squared error
             loss_train = T.mean(T.sum((target - train_out)**2, axis=1))
             loss_valid = T.mean(T.sum((target - valid_out)**2, axis=1))
-        elif loss_type == 'nnrank-re':
+        elif loss_type == 'nnrank-re': # cross entropy
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
             loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
+        elif loss_type == 'nnrank-re-popw': # population weighted
+            # member of each class is scaled down/up as until batch is uniformly made
+            # up of gradients of all classes
+            avg_klass_size = self.batch_size / float(K)
+            klass_proportions = avg_klass_size / T.sum(T.eq(y.dimshuffle(0,'x'), numpy.repeat(numpy.array([list(range(K))]), self.batch_size,axis=0)),0)
+            klass_weights = klass_proportions[y]
+            loss_train = -T.mean(klass_weights * T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
+            loss_valid = -T.mean(klass_weights * T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
+        elif loss_type == 'nnrank-re-pathw': # pathologically weighted
+            # non-pathological classes are weighted down so that they contribute
+            # just as much as pathological classes to gradient
+            non_pathological_cases = T.eq(y, numpy.zeros(self.batch_size))
+            num_non_pathological_cases = T.sum(non_pathological_cases) + numpy.spacing(1)
+            non_pathological_cases_scale = ((self.batch_size - num_non_pathological_cases)/num_non_pathological_cases) * non_pathological_cases
+            klass_weights = non_pathological_cases_scale + T.neq(y, numpy.zeros(self.batch_size)) # fill in with ones for pathologicals
+            loss_train = -T.mean(klass_weights * T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
+        elif (loss_type == 'nnrank-re-kappa') and (self.num_output_classes == K-1): # wrong guesses are weighted with severity of effect on kappa score
+            dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
+            dy = dx.transpose()
+            d = (dx - dy)**2 / (K-1)**2
+            incorrect_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
+            incorrect_penalty = theano.shared(lasagne.utils.floatX((incorrect_penalty)))
+            loss_train = -T.mean(T.sum(target*T.log(train_out) + (incorrect_penalty[y])*T.log(1-train_out), axis=1))
+            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (incorrect_penalty[y])*T.log(1-valid_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid, valid_out
