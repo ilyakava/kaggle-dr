@@ -173,13 +173,31 @@ class VGGNet(object):
             non_pathological_cases_scale = ((self.batch_size - num_non_pathological_cases)/num_non_pathological_cases) * non_pathological_cases
             klass_weights = non_pathological_cases_scale + T.neq(y, numpy.zeros(self.batch_size)) # fill in with ones for pathologicals
             loss_train = -T.mean(klass_weights * T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-        elif (loss_type == 'nnrank-re-kappa') and (self.num_output_classes == K-1): # wrong guesses are weighted with severity of effect on kappa score
+        elif (loss_type == 'nnrank-re-qkappa') and (self.num_output_classes == K-1): # wrong guesses are weighted with severity of effect on kappa score
             dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
             dy = dx.transpose()
-            d = (dx - dy)**2 / (K-1)**2
+            d = (dx - dy)**2
             incorrect_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
             incorrect_penalty = theano.shared(lasagne.utils.floatX((incorrect_penalty)))
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (incorrect_penalty[y])*T.log(1-train_out), axis=1))
+        elif (loss_type == 'nnrank-re-qkappa-sym') and (self.num_output_classes == K-1):
+            dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
+            dy = dx.transpose()
+            d = (dx - dy)**2
+            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
+            underestimate_penalty = overestimate_penalty[::-1, ::-1]
+            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
+        elif (loss_type == 'nnrank-re-kappa-sym') and (self.num_output_classes == K-1):
+            dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
+            dy = dx.transpose()
+            d = abs(dx - dy)
+            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
+            underestimate_penalty = overestimate_penalty[::-1, ::-1]
+            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid, valid_out
