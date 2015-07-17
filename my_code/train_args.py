@@ -142,5 +142,23 @@ def get():
                         type=int,
                         default=None,
                         help="When used in conjunction with -S, changes the uniform distribution of classes to whatever ascending class frequency counts specified here. '-R 94 9 19 3 3' replicates the training set distribution. To set a new '-x', multiply the old '-x' by: ((274*custom_distribution) / [25810,2443,5292,873,708])[sample_class].")
+    parser.add_argument("-C",
+                        "--train-color-cast",
+                        type=str,
+                        default='no_cast',
+                        help="Method that returns integers to add to image channels.")
+    parser.add_argument("-C2",
+                        "--valid-color-cast",
+                        type=str,
+                        default='no_cast')
+    parser.add_argument("-C3",
+                        "--test-color-cast",
+                        type=str,
+                        default='no_cast')
+    parser.add_argument("-G",
+                        "--color-cast-range",
+                        type=int,
+                        default=20,
+                        help="Maximum value with which to bias a color channel.")
 
     return parser.parse_args()
