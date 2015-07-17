@@ -10,9 +10,10 @@ import pdb
 
 PROPORTION_ERROR_MARGIN = 0.01 # 1 percent
 SAMPLE_COUNT_ERROR_MARGIN = 5 # misplaced samples
+ACTUAL_TRAIN_DR_PROPORTIONS = [25810, 2443, 5292, 873, 708]
 
 def create_skewed_CSV():
-    populations = [25810, 2443, 5292, 873, 708] # actual DR proportions in descending classes
+    populations = ACTUAL_TRAIN_DR_PROPORTIONS
     K = len(populations)
     proportions = [(populations[klass] / float(sum(populations))) for klass in reversed(xrange(K))]
     id = 0
@@ -26,15 +27,15 @@ def create_skewed_CSV():
                 writer.writerow(['%s_%i' % (str(uuid.uuid4())[:8], id), klass])
     return(tmp.name, numpy.array(proportions))
 
+def get_proportions(dataset):
+    return numpy.array([len(dataset[klass])/(len(numpy.concatenate(dataset.values()).flatten()) + numpy.spacing(1)) for klass in reversed(sorted(dataset.keys()))])
+
 class CreateTrainValTestSet(unittest.TestCase):
 
     def setUp(self):
         f, self.true_proportions = create_skewed_CSV()
         self.K = len(self.true_proportions)
         self.bd = BlockDesigner(f, self.K)
-
-    def get_proportions(self, dataset):
-        return numpy.array([len(dataset[klass])/(len(numpy.concatenate(dataset.values()).flatten()) + numpy.spacing(1)) for klass in reversed(xrange(self.K))])
 
     def get_counts(self, dataset):
         return numpy.array([len(dataset[klass]) for klass in reversed(xrange(self.K))])
@@ -95,15 +96,14 @@ class CreateTrainValTestSet(unittest.TestCase):
             sum(self.get_counts(valid_dataset) + self.get_counts(train_dataset)) == self.bd.init_size
         )
 
-        K = len(self.true_proportions)
-        valid_proportions = self.get_proportions(valid_dataset)
-        train_proportions = self.get_proportions(train_dataset)
+        valid_proportions = get_proportions(valid_dataset)
+        train_proportions = get_proportions(train_dataset)
 
         self.failUnless(
-            sum(abs(valid_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == K
+            sum(abs(valid_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
         )
         self.failUnless(
-            sum(abs(train_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == K
+            sum(abs(train_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
         )
 
     def test_all_sets(self):
@@ -114,19 +114,18 @@ class CreateTrainValTestSet(unittest.TestCase):
             sum(self.get_counts(test_dataset) + self.get_counts(valid_dataset) + self.get_counts(train_dataset)) == self.bd.init_size
         )
 
-        K = len(self.true_proportions)
-        test_proportions = self.get_proportions(test_dataset)
-        valid_proportions = self.get_proportions(valid_dataset)
-        train_proportions = self.get_proportions(train_dataset)
+        test_proportions = get_proportions(test_dataset)
+        valid_proportions = get_proportions(valid_dataset)
+        train_proportions = get_proportions(train_dataset)
 
         self.failUnless(
-            sum(abs(test_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == K
+            sum(abs(test_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
         )
         self.failUnless(
-            sum(abs(valid_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == K
+            sum(abs(valid_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
         )
         self.failUnless(
-            sum(abs(train_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == K
+            sum(abs(train_proportions - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
         )
 
 def main():

@@ -87,7 +87,8 @@ class DataStream(object):
                  valid_dataset_size=4864,
                  valid_flip='no_flip',
                  test_flip='no_flip',
-                 uniform_sample_class=None):
+                 sample_class=None,
+                 custom_distribution=None):
         self.train_image_dir = train_image_dir
         self.test_image_dir = test_image_dir
         self.image_shape = image_shape
@@ -105,7 +106,8 @@ class DataStream(object):
         self.test_flip_lambda = test_set_flipper.get_flip_lambda(test_flip, deterministic=True)
         self.valid_dataset_size = valid_dataset_size
         self.random_seed = random_seed
-        self.uniform_sample_class = uniform_sample_class
+        self.sample_class = sample_class
+        self.custom_distribution = custom_distribution
 
         bd = BlockDesigner(TRAIN_LABELS_CSV_PATH, seed=self.random_seed)
 
@@ -237,9 +239,9 @@ class DataStream(object):
         Each self.batch_size of examples follows the same distribution
         """
         bd = BlockDesigner(self.train_examples)
-        if self.uniform_sample_class:
+        if self.sample_class:
             samp = Sampler(bd.remainder(), seed=self.random_seed)
-            images, labels = samp.uniform_full_sample_class(self.uniform_sample_class, self.batch_size)
+            images, labels = samp.custom_distribution(self.sample_class, self.batch_size, self.custom_distribution)
             return {"X": images, "y": labels}
         else:
             blocks = bd.break_off_multiple_blocks(self.n_train_batches, self.batch_size)

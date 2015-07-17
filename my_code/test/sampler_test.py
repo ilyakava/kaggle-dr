@@ -5,7 +5,7 @@ import uuid
 import numpy
 
 from my_code.sampler import Sampler
-from my_code.test.block_designer_test import create_skewed_CSV
+from my_code.test.block_designer_test import create_skewed_CSV, ACTUAL_TRAIN_DR_PROPORTIONS, get_proportions, PROPORTION_ERROR_MARGIN
 from my_code.block_designer import BlockDesigner
 
 import pdb
@@ -16,14 +16,34 @@ class SampleTrainValTestSet(unittest.TestCase):
         f, self.true_proportions = create_skewed_CSV()
         self.K = len(self.true_proportions)
         self.bd = BlockDesigner(f, self.K)
+        self.samp = Sampler(self.bd.remainder())
 
     def test_all_classes(self):
-        samp = Sampler(self.bd.remainder())
         for test_klass in range(self.bd.K):
-            X, y = samp.uniform_full_sample_class(test_klass, 128)
+            X, y = self.samp.custom_distribution(test_klass, 128)
             self.failUnless(
                 (len(y) == len(X)) and (len(X) % 128 == 0)
             )
+
+    def test_cycles_through_all_data(self):
+        X, y = self.samp.custom_distribution(0, 128)
+        X2, y2 = self.samp.custom_distribution(0, 128)
+        self.failUnless(
+            len(set(X+X2)) == sum(ACTUAL_TRAIN_DR_PROPORTIONS)
+        )
+
+    def test_custom_distribution(self):
+        X, y = self.samp.custom_distribution(0, 128, [94,9,19,3,3])
+
+        collect = {}
+        for k in set(y):
+            collect[k] = []
+        for i, klass in enumerate(y):
+            collect[klass].append(X[i])
+
+        self.failUnless(
+            sum(abs(get_proportions(collect) - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
+        )
 
 def main():
   unittest.main()

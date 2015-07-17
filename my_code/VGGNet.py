@@ -24,6 +24,7 @@ from lasagne.nonlinearities import LeakyRectify
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
 import my_code.train_args as train_args
+from my_code.test.block_designer_test import ACTUAL_TRAIN_DR_PROPORTIONS
 
 import pdb
 
@@ -139,6 +140,8 @@ class VGGNet(object):
         valid_out = lasagne.layers.get_output(output, X, deterministic=True)
         klass_targets, pred_valid = self.build_target_label_prediction(valid_out, loss_type, K)
         target = klass_targets[y]
+        if re.search('re', loss_type): # relative entropy
+            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
 
         if loss_type == 'one-hot': # requires that y has no more than self.num_output_classes classes
             objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
@@ -150,13 +153,11 @@ class VGGNet(object):
             loss_valid = -T.mean(T.sum(target*T.log(valid_out), axis=1))
         elif (loss_type == 'one-hot-re') and (self.num_output_classes == K): # relative entropy
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         elif loss_type == 'nnrank-mse': # mean squared error
             loss_train = T.mean(T.sum((target - train_out)**2, axis=1))
             loss_valid = T.mean(T.sum((target - valid_out)**2, axis=1))
-        elif loss_type == 'nnrank-re': # cross entropy
+        elif loss_type == 'nnrank-re':
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         elif loss_type == 'nnrank-re-popw': # population weighted
             # member of each class is scaled down/up as until batch is uniformly made
             # up of gradients of all classes
@@ -164,7 +165,6 @@ class VGGNet(object):
             klass_proportions = avg_klass_size / T.sum(T.eq(y.dimshuffle(0,'x'), numpy.repeat(numpy.array([list(range(K))]), self.batch_size,axis=0)),0)
             klass_weights = klass_proportions[y]
             loss_train = -T.mean(klass_weights * T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(klass_weights * T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         elif loss_type == 'nnrank-re-pathw': # pathologically weighted
             # non-pathological classes are weighted down so that they contribute
             # just as much as pathological classes to gradient
@@ -173,7 +173,6 @@ class VGGNet(object):
             non_pathological_cases_scale = ((self.batch_size - num_non_pathological_cases)/num_non_pathological_cases) * non_pathological_cases
             klass_weights = non_pathological_cases_scale + T.neq(y, numpy.zeros(self.batch_size)) # fill in with ones for pathologicals
             loss_train = -T.mean(klass_weights * T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
         elif (loss_type == 'nnrank-re-kappa') and (self.num_output_classes == K-1): # wrong guesses are weighted with severity of effect on kappa score
             dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
             dy = dx.transpose()
@@ -181,7 +180,6 @@ class VGGNet(object):
             incorrect_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
             incorrect_penalty = theano.shared(lasagne.utils.floatX((incorrect_penalty)))
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (incorrect_penalty[y])*T.log(1-train_out), axis=1))
-            loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (incorrect_penalty[y])*T.log(1-valid_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid, valid_out
@@ -400,13 +398,15 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  decay_limit, loss_type, validations_per_epoch, train_flip,
                  shuffle, test_dataset, random_seed, valid_dataset_size,
                  noise_decay_start, noise_decay_duration, noise_decay_severity,
-                 valid_flip, test_flip, uniform_sample_class):
+                 valid_flip, test_flip, sample_class, custom_distribution):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
+    if custom_distribution and sample_class: # lame hardcode
+        print("[INFO] %.2f current epochs equals 1 BlockDesigner epoch" % ((274.0*numpy.array(custom_distribution)) / numpy.array(ACTUAL_TRAIN_DR_PROPORTIONS))[sample_class])
 
     model_spec, image_shape, pad = load_model_specs(network, as_grey)
 
-    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, uniform_sample_class=uniform_sample_class)
+    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution)
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
     try:
         column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
@@ -448,4 +448,5 @@ if __name__ == '__main__':
                 noise_decay_severity=_.noise_decay_severity,
                 valid_flip=_.valid_flip,
                 test_flip=_.test_flip,
-                uniform_sample_class=_.uniform_sample_class)
+                sample_class=_.sample_class,
+                custom_distribution=_.custom_distribution)
