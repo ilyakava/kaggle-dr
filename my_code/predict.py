@@ -27,7 +27,7 @@ def model_runid(model_file):
 
 def load_column(model_file, train_dataset, center, normalize, train_flip,
                 test_dataset, random_seed, valid_dataset_size):
-    print("Loading...")
+    print("Loading Model...")
     f = open(model_file)
     batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
     f.close()

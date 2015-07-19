@@ -43,7 +43,7 @@ class ImageFlipOracle(object):
             }[flip_mode]
 
     def no_flip(self, image_name):
-        return numpy.array([0,0])
+        return numpy.zeros(2)
 
     def rand_flip(self, image_name):
         return numpy.array([int(round(random.random())), int(round(random.random()))])
@@ -246,10 +246,10 @@ class DataStream(object):
             image = numpy.fliplr(image)
         return image
 
-    def feed_image(self, image_name, image_dir, flip_lambda, color_cast_lambda):
+    def feed_image(self, image_name, image_dir, flip_lambda=None, color_cast_lambda=None):
         img = self.read_image(image_name, image_dir)
-        flip_coords = flip_lambda(image_name)
-        color_cast = color_cast_lambda()
+        flip_coords = flip_lambda(image_name) if flip_lambda else numpy.zeros(2)
+        color_cast = color_cast_lambda() if color_cast_lambda else numpy.zeros(self.image_shape[-1])
         return self.preprocess_image(img, flip_coords, color_cast)
 
     def calc_mean_std_image(self):
