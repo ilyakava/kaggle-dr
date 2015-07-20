@@ -145,7 +145,7 @@ def get():
     parser.add_argument("-C",
                         "--train-color-cast",
                         type=str,
-                        default='no_cast',
+                        default='baidu_cast',
                         help="Method that returns integers to add to image channels.")
     parser.add_argument("-C2",
                         "--valid-color-cast",
@@ -158,7 +158,12 @@ def get():
     parser.add_argument("-G",
                         "--color-cast-range",
                         type=int,
-                        default=20,
+                        default=30,
                         help="Maximum value with which to bias a color channel.")
+    parser.add_argument("-O",
+                        "--override-input-size",
+                        type=int,
+                        default=None,
+                        help="Override the size of the image used as reported in network_specs.json.")
 
     return parser.parse_args()

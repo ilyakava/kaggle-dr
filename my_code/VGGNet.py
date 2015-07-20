@@ -25,6 +25,7 @@ from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredict
 from my_code.data_stream import DataStream
 import my_code.train_args as train_args
 from my_code.test.block_designer_test import ACTUAL_TRAIN_DR_PROPORTIONS
+from my_code.layers import Fold4xChannelsLayer, Fold4xBatchesLayer, Unfold4xBatchesLayer
 
 import pdb
 
@@ -62,9 +63,8 @@ class VGGNet(object):
         y_batch = T.ivector('y')
         batch_slice = slice(cache_block_index * self.batch_size, (cache_block_index + 1) * self.batch_size)
 
-        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type)
-
         self.params = lasagne.layers.get_all_params(self.all_layers[-1])
+        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type)
         updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
 
         print("Compiling...")
@@ -158,6 +158,14 @@ class VGGNet(object):
             loss_valid = T.mean(T.sum((target - valid_out)**2, axis=1))
         elif loss_type == 'nnrank-re':
             loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
+        elif loss_type == 'nnrank-re-l1':
+            lambda_ = 0.01
+            l1 = (lambda_ / (2*self.batch_size)) * sum([abs(params).sum() for params in self.params])
+            loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1)) + l1
+        elif loss_type == 'nnrank-re-l2':
+            lambda_ = 0.01
+            l2 = (lambda_ / (2*self.batch_size)) * sum([(params ** 2).sum() for params in self.params])
+            loss_train = -T.mean(T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1)) + l2
         elif loss_type == 'nnrank-re-popw': # population weighted
             # member of each class is scaled down/up as until batch is uniformly made
             # up of gradients of all classes
@@ -173,27 +181,29 @@ class VGGNet(object):
             non_pathological_cases_scale = ((self.batch_size - num_non_pathological_cases)/num_non_pathological_cases) * non_pathological_cases
             klass_weights = non_pathological_cases_scale + T.neq(y, numpy.zeros(self.batch_size)) # fill in with ones for pathologicals
             loss_train = -T.mean(klass_weights * T.sum(target*T.log(train_out) + (1-target)*T.log(1-train_out), axis=1))
-        elif (loss_type == 'nnrank-re-qkappa') and (self.num_output_classes == K-1): # wrong guesses are weighted with severity of effect on kappa score
-            dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
+        elif (loss_type == 'nnrank-re-sqrtkappa-sym') and (self.num_output_classes == K-1):
+            dx = numpy.ones((K,1)) * numpy.arange(K)
             dy = dx.transpose()
-            d = (dx - dy)**2
-            incorrect_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
-            incorrect_penalty = theano.shared(lasagne.utils.floatX((incorrect_penalty)))
-            loss_train = -T.mean(T.sum(target*T.log(train_out) + (incorrect_penalty[y])*T.log(1-train_out), axis=1))
-        elif (loss_type == 'nnrank-re-qkappa-sym') and (self.num_output_classes == K-1):
-            dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
-            dy = dx.transpose()
-            d = (dx - dy)**2
-            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
+            d = numpy.sqrt(abs(dx - dy))
+            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + (numpy.sum(numpy.triu(d[:,1:]), axis=1)/(numpy.arange(K)[::-1]+numpy.spacing(1))).reshape((5,1)))
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
             overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
             underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         elif (loss_type == 'nnrank-re-kappa-sym') and (self.num_output_classes == K-1):
-            dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
+            dx = numpy.ones((K,1)) * numpy.arange(K)
             dy = dx.transpose()
             d = abs(dx - dy)
-            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + numpy.sum(numpy.triu(d[:,1:]), axis=1).reshape((5,1)))
+            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + (numpy.sum(numpy.triu(d[:,1:]), axis=1)/(numpy.arange(K)[::-1]+numpy.spacing(1))).reshape((5,1)))
+            underestimate_penalty = overestimate_penalty[::-1, ::-1]
+            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
+        elif (loss_type == 'nnrank-re-poly2kappa-sym') and (self.num_output_classes == K-1):
+            dx = numpy.ones((K,1)) * numpy.arange(K)
+            dy = dx.transpose()
+            d = abs(dx - dy) + (dx - dy)**2
+            overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + (numpy.sum(numpy.triu(d[:,1:]), axis=1)/(numpy.arange(K)[::-1]+numpy.spacing(1))).reshape((5,1)))
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
             overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
             underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
@@ -223,8 +233,14 @@ class VGGNet(object):
                 "Orthogonal": lasagne.init.Orthogonal(gain='relu'),
                 "GlorotUniform": lasagne.init.GlorotUniform()
             }[req]
+        def get_custom(layer):
+            return {
+                "Fold4xChannelsLayer": Fold4xChannelsLayer,
+                "Fold4xBatchesLayer": Fold4xBatchesLayer,
+                "Unfold4xBatchesLayer": Unfold4xBatchesLayer
+            }[layer]
 
-        all_layers = [layers.InputLayer(shape=(None, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
+        all_layers = [layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             if cs["type"] == "CONV":
@@ -257,6 +273,9 @@ class VGGNet(object):
                                    num_units=self.num_output_classes,
                                    W=get_init(cs),
                                    nonlinearity=get_nonlinearity(cs)))
+            elif cs["type"] == "CUSTOM":
+                custom_layer = get_custom(cs["name"])
+                all_layers.append(custom_layer(all_layers[-1]))
             else:
                 raise NotImplementedError()
         return all_layers
@@ -399,12 +418,12 @@ def save_results(filename, multi_params):
         cPickle.dump(params, f, -1)
     f.close()
 
-def load_model_specs(network, as_grey):
+def load_model_specs(network, as_grey, override_input_size):
     with open('network_specs.json') as data_file:
         network = json.load(data_file)[network]
         netspec = network['layers']
         pad = network['pad']
-        input_image_size = network['rec_input_size']
+        input_image_size = override_input_size or network['rec_input_size']
     input_image_channels = 1 if as_grey else 3
     image_shape = (input_image_size, input_image_size, input_image_channels)
     model_spec = [{ "type": "INPUT", "size": input_image_size, "channels": input_image_channels}] + netspec
@@ -417,13 +436,14 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  shuffle, test_dataset, random_seed, valid_dataset_size,
                  noise_decay_start, noise_decay_duration, noise_decay_severity,
                  valid_flip, test_flip, sample_class, custom_distribution,
-                 train_color_cast, valid_color_cast, test_color_cast, color_cast_range):
+                 train_color_cast, valid_color_cast, test_color_cast,
+                 color_cast_range, override_input_size):
     runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
         print("[INFO] %.2f current epochs equals 1 BlockDesigner epoch" % ((274.0*numpy.array(custom_distribution)) / numpy.array(ACTUAL_TRAIN_DR_PROPORTIONS))[sample_class])
 
-    model_spec, image_shape, pad = load_model_specs(network, as_grey)
+    model_spec, image_shape, pad = load_model_specs(network, as_grey, override_input_size)
 
     data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution, train_color_cast=train_color_cast, valid_color_cast=valid_color_cast, test_color_cast=test_color_cast, color_cast_range=color_cast_range)
     column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
@@ -472,4 +492,5 @@ if __name__ == '__main__':
                 train_color_cast=_.train_color_cast,
                 valid_color_cast=_.valid_color_cast,
                 test_color_cast=_.test_color_cast,
-                color_cast_range=_.color_cast_range)
+                color_cast_range=_.color_cast_range,
+                override_input_size=_.override_input_size)
