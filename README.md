@@ -64,7 +64,7 @@ Place `trainLabels.csv` into `data/train`
 
 ### Preparing Data for the Network
 
-#### Full Size Originals -> Smaller Originals (~2.3 seconds per image)
+#### Full Size Originals -> Smaller Originals (~2.5 images per second)
 
 (Ex) This will create 3 batchfiles for graphicsmagick to output 128x128 pngs:
 

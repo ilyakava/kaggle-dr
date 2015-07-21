@@ -34,9 +34,6 @@ class VGGNet(object):
                  leak_alpha, model_spec, loss_type, num_output_classes, pad,
                  image_shape, runid=None):
         self.column_init_args = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape]
-        layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad)
-        print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
-        print "[INFO] Estimated memory usage is %f MB per input image" % round(sum(layer_parameter_counts) * 4e-6 * 3, 2)
         # data setup
         self.ds = data_stream
         self.batch_size = batch_size
@@ -59,6 +56,12 @@ class VGGNet(object):
         self.valid_y = T.cast(theano.shared(self.valid_y), 'int32')
         # network setup
         self.all_layers = self.build_model(model_spec, leak_alpha, pad)
+        widths, weights, memory = self.widths_and_total_num_parameters()
+        print "[DEBUG] all_layers input widths: {}".format(widths)
+        print "[DEBUG] all_layers weights: {}".format(weights)
+        print "[INFO]  %f Million parameters in model" % round(sum(weights) * 1e-6, 2)
+        fudge_factor = 2.73 # empirically determined on M2090
+        print "[INFO] Estimated memory usage is %f MB per input image" % round(memory * 4e-6 * fudge_factor, 2)
 
         learning_rate = T.fscalar()
         cache_block_index = T.iscalar('cache_block_index')
@@ -95,25 +98,27 @@ class VGGNet(object):
             },
         )
 
-    def precompute_layer_sizes(self, model_spec, pad):
-        layer_input_sizes = numpy.ones(len(model_spec), dtype=int)
-        layer_input_sizes[0] = model_spec[0]["size"]
-        layer_input_sizes[1] = layer_input_sizes[0]
-        for i in xrange(2,len(model_spec)):
-            downsample = (model_spec[i-1].get("pool_stride") or 1) if (model_spec[i-1]["type"] == "CONV") else 1
-            if (model_spec[i-1]["type"] == "CONV") or (i == 1):
-                # int division will automatically round down to match ignore_border=T
-                # in theano.tensor.signal.downsample.max_pool_2d
-                if pad:
-                    assert(model_spec[i-1]["filter_size"] - 2*pad == 1) # must be able to handle edge pixels (plus no even conv filters allowed)
-                    # additive = 0 if (cuda_convnet and (len(model_spec[i]) >= 3)) else 2 # can't remember what this has to do with (maybe it is with odd sizes? will discover later)
-                    additive = 0 if cuda_convnet else 2
-                    layer_input_sizes[i] = (layer_input_sizes[i-1] + additive) / downsample
-                else: #(prev_size - cur_conv / maxpool degree)
-                    layer_input_sizes[i] = ((layer_input_sizes[i-1] - model_spec[i-1]["filter_size"]) / downsample) + 1
-        width = model_spec[i - 1]["num_filters"] if model_spec[i-1]["type"] == "CONV" else model_spec[i - 1]["num_units"]
-        layer_parameter_counts = [0] + [width*layer_input_sizes[i]**2 for i in xrange(1,len(model_spec))]
-        return [layer_input_sizes, layer_parameter_counts]
+    def widths_and_total_num_parameters(self):
+        # http://cs231n.github.io/convolutional-networks/
+        memory = numpy.prod(self.all_layers[0].output_shape[1:])
+        weights = []
+        widths = [self.all_layers[0].output_shape[-1]]
+        for i in range(1,len(self.all_layers)):
+            l = self.all_layers[i]
+            p = self.all_layers[i-1]
+            if type(l) is layers.dense.DenseLayer:
+                memory += l.output_shape[-1]
+                widths.append(l.output_shape[-1])
+                weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1])
+            elif type(l) is layers.pool.FeaturePoolLayer:
+                memory += l.output_shape[-1]
+            elif type(l) is layers.cuda_convnet.Conv2DCCLayer:
+                memory += numpy.prod(l.output_shape[1:])
+                weights.append(numpy.prod(l.get_W_shape()[2:])*p.output_shape[1]*l.output_shape[1])
+            elif type(l) is layers.cuda_convnet.MaxPool2DCCLayer:
+                memory += numpy.prod(l.output_shape[1:])
+                widths.append(l.output_shape[-1])
+        return(widths,weights,memory)
 
     def build_target_label_prediction(self, valid_out, loss_type, K):
         """
