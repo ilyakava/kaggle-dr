@@ -30,7 +30,9 @@ from my_code.layers import Fold4xChannelsLayer, Fold4xBatchesLayer, Unfold4xBatc
 import pdb
 
 class VGGNet(object):
-    def __init__(self, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape):
+    def __init__(self, data_stream, batch_size, init_learning_rate, momentum,
+                 leak_alpha, model_spec, loss_type, num_output_classes, pad,
+                 image_shape, runid=None):
         self.column_init_args = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape]
         layer_input_sizes, layer_parameter_counts = self.precompute_layer_sizes(model_spec, pad)
         print "[DEBUG] all_layers input widths: {}".format(layer_input_sizes)
@@ -46,6 +48,7 @@ class VGGNet(object):
         self.learning_rate = init_learning_rate
         self.learning_rate_decayed_epochs = []
         self.flip_noise = 1
+        self.runid = runid
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
@@ -324,6 +327,14 @@ class VGGNet(object):
                 self.historical_train_losses.append([self.iter, batch_loss])
                 yield batch_loss
 
+    def save_progress(self):
+        val_losses = numpy.array(self.historical_val_losses)
+        val_kappas = numpy.array(self.historical_val_kappas)
+        if min(val_losses[:,1]) == val_losses[-1,1]:
+            self.save("%s-bestval" % (self.runid))
+        if max(val_kappas[:,1]) == val_kappas[-1,1]:
+            self.save("%s-bestkappa" % (self.runid))
+
     def decay_learning_rate(self, patience, factor, limit):
         if (len(self.learning_rate_decayed_epochs) < limit and
             max([0] + self.learning_rate_decayed_epochs) + patience < self.epoch): # also skip first n epochs (n = patience)
@@ -387,6 +398,7 @@ class VGGNet(object):
                     print('training @ iter = %i @ %.1fm (ETA %.1fm). Cur training error is %f %%' %
                         (self.iter, ((time.clock() - start_time )/60.), mins_per_epoch*(max_epochs-self.epoch), 100*batch_train_loss))
                     self.validate()
+                    self.save_progress()
                     print('     averaging %f mins per epoch' % mins_per_epoch)
 
     def save(self, filename=None):
@@ -438,7 +450,7 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  valid_flip, test_flip, sample_class, custom_distribution,
                  train_color_cast, valid_color_cast, test_color_cast,
                  color_cast_range, override_input_size):
-    runid = "%s-%s-%s-nu%f-a%i-cent%i-norm%i-amp%i-grey%i-out%i-dp%i-df%i" % (str(uuid.uuid4())[:8], network, loss_type, init_learning_rate, leak_alpha, center, normalize, amplify, int(as_grey), num_output_classes, decay_patience, decay_factor)
+    runid = "%s-%s-%s" % (str(uuid.uuid4())[:8], network, loss_type)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
         print("[INFO] %.2f current epochs equals 1 BlockDesigner epoch" % ((274.0*numpy.array(custom_distribution)) / numpy.array(ACTUAL_TRAIN_DR_PROPORTIONS))[sample_class])
@@ -446,14 +458,14 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
     model_spec, image_shape, pad = load_model_specs(network, as_grey, override_input_size)
 
     data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution, train_color_cast=train_color_cast, valid_color_cast=valid_color_cast, test_color_cast=test_color_cast, color_cast_range=color_cast_range)
-    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape)
+    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, runid)
     try:
         column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     except UnsupportedPredictedClasses as e:
         print "[ERROR] UnsupportedPredictedClasses {}, saving results".format(e.args[0])
-    column.save(runid)
+    column.save("%s_final" % runid)
     save_results(runid, [[column.historical_train_losses, column.historical_val_losses, column.historical_val_kappas, column.n_train_batches], [column.learning_rate_decayed_epochs]])
     print(time.strftime("Finished at %H:%M:%S on %Y-%m-%d"))
 
