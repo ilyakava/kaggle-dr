@@ -244,6 +244,7 @@ class VGGNet(object):
             }[layer]
 
         all_layers = [layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
+        all_layers.append(layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             if cs["type"] == "CONV":
@@ -255,12 +256,16 @@ class VGGNet(object):
                                     filter_size=(cs["filter_size"], cs["filter_size"]),
                                     border_mode=border_mode,
                                     W=get_init(cs),
-                                    nonlinearity=get_nonlinearity(cs)))
+                                    nonlinearity=get_nonlinearity(cs),
+                                    dimshuffle=False))
                 if cs.get("pool_size"):
                     all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1],
                                         pool_size=(cs["pool_size"], cs["pool_size"]),
-                                        stride=(cs["pool_stride"], cs["pool_stride"])))
+                                        stride=(cs["pool_stride"], cs["pool_stride"]),
+                                        dimshuffle=False))
             elif cs["type"] == "FC":
+                if model_spec[i-1]["type"] == "CONV":
+                    all_layers.append(layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
                 all_layers.append(layers.DenseLayer(all_layers[-1],

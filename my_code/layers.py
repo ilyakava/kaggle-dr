@@ -7,6 +7,7 @@ import pdb
 
 class Fold4xChannelsLayer(lasagne.layers.Layer):
     def get_output_for(self, input, **kwargs):
+        # expects bc01
         n_folds = 2
         midpoint, remainder = divmod(input.shape[-1], n_folds)
         tile1 = input[:, :, :midpoint, :midpoint] # tl
@@ -21,6 +22,7 @@ class Fold4xChannelsLayer(lasagne.layers.Layer):
 
 class Fold4xBatchesLayer(lasagne.layers.Layer):
     def get_output_for(self, input, **kwargs):
+        # expects bc01
         midpoint, remainder = divmod(input.shape[-1], 2)
         tile1 = input[:, :, :midpoint, :midpoint] # 0 degrees
         tile2 = input[:, :, :midpoint, :-(midpoint+1):-1].dimshuffle(0, 1, 3, 2) # 90 degrees
@@ -34,6 +36,7 @@ class Fold4xBatchesLayer(lasagne.layers.Layer):
 
 class Unfold4xBatchesLayer(lasagne.layers.Layer):
     def get_output_for(self, input, **kwargs):
+        # expects bc01
         input_r = input.reshape((4, self.input_shape[0] // 4, int(numpy.prod(self.input_shape[1:]))))
         return input_r.transpose(1, 0, 2).reshape(self.get_output_shape())
 
