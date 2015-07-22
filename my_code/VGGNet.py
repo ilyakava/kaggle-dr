@@ -32,7 +32,7 @@ import pdb
 class VGGNet(object):
     def __init__(self, data_stream, batch_size, init_learning_rate, momentum,
                  leak_alpha, model_spec, loss_type, num_output_classes, pad,
-                 image_shape, runid=None):
+                 image_shape, filter_shape, runid=None):
         self.column_init_args = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape]
         # data setup
         self.ds = data_stream
@@ -55,8 +55,8 @@ class VGGNet(object):
         valid_x = theano.shared(lasagne.utils.floatX(valid_x))
         self.valid_y = T.cast(theano.shared(self.valid_y), 'int32')
         # network setup
-        self.all_layers = self.build_model(model_spec, leak_alpha, pad)
-        widths, weights, memory = self.widths_and_total_num_parameters()
+        self.all_layers = self.build_model(model_spec, leak_alpha, pad, filter_shape)
+        widths, weights, memory = self.widths_and_total_num_parameters(filter_shape)
         print "[DEBUG] all_layers input widths: {}".format(widths)
         print "[DEBUG] all_layers weights: {}".format(weights)
         print "[INFO]  %f Million parameters in model" % round(sum(weights) * 1e-6, 2)
@@ -98,26 +98,30 @@ class VGGNet(object):
             },
         )
 
-    def widths_and_total_num_parameters(self):
+    def widths_and_total_num_parameters(self, filter_shape):
         # http://cs231n.github.io/convolutional-networks/
-        memory = numpy.prod(self.all_layers[0].output_shape[1:])
+        _c01 = slice(0,-1) if filter_shape == 'c01b' else slice(1,5)
+        _01 = slice(1,-1) if filter_shape == 'c01b' else slice(2,5)
+        _c = 0 if filter_shape == 'c01b' else 1
+
+        memory = numpy.prod(self.all_layers[0].output_shape[1:]) # pre 1st dimshuffle, i.e. bc01 no matter what
         weights = []
-        widths = [self.all_layers[0].output_shape[-1]]
+        widths = [self.all_layers[0].output_shape[-1]] # pre 1st dimshuffle, i.e. bc01 no matter what
         for i in range(1,len(self.all_layers)):
             l = self.all_layers[i]
             p = self.all_layers[i-1]
             if type(l) is layers.dense.DenseLayer:
                 memory += l.output_shape[-1]
                 widths.append(l.output_shape[-1])
-                weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1])
+                weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1]) # after 2nd dimshuffle, i.e. bc01 no matter what
             elif type(l) is layers.pool.FeaturePoolLayer:
                 memory += l.output_shape[-1]
             elif type(l) is layers.cuda_convnet.Conv2DCCLayer:
-                memory += numpy.prod(l.output_shape[1:])
-                weights.append(numpy.prod(l.get_W_shape()[2:])*p.output_shape[1]*l.output_shape[1])
+                memory += numpy.prod(l.output_shape[_c01])
+                weights.append(numpy.prod(l.get_W_shape()[_01])*p.output_shape[_c]*l.output_shape[_c])
             elif type(l) is layers.cuda_convnet.MaxPool2DCCLayer:
-                memory += numpy.prod(l.output_shape[1:])
-                widths.append(l.output_shape[-1])
+                memory += numpy.prod(l.output_shape[_c01])
+                widths.append(l.output_shape[2])
         return(widths,weights,memory)
 
     def build_target_label_prediction(self, valid_out, loss_type, K):
@@ -216,11 +220,33 @@ class VGGNet(object):
             overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
             underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
+        elif (loss_type == 'nnrank-re-custkappa-sym') and (self.num_output_classes == K-1):
+            # target(3,4) + poly2 hybrid
+            overestimate_penalty = numpy.array([[ 1  ,  1  ,  1  ,  1  ],
+                                                [ 0. ,  1  ,  1  ,  1  ],
+                                                [ 0. ,  0. ,  0.5,  1.5],
+                                                [ 0. ,  0. ,  0. ,  1. ],
+                                                [ 0. ,  0. ,  0. ,  0. ]])
+            underestimate_penalty = overestimate_penalty[::-1, ::-1]
+            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
+        elif (loss_type == 'nnrank-re-cust2kappa-sym') and (self.num_output_classes == K-1):
+            # kappa(3,4), poly2 hybrid
+            overestimate_penalty = numpy.array([[ 0.4,  0.8,  1.2,  1.6],
+                                                [ 0. ,  0.5,  1. ,  1.5],
+                                                [ 0. ,  0. ,  0.5,  1.5],
+                                                [ 0. ,  0. ,  0. ,  1. ],
+                                                [ 0. ,  0. ,  0. ,  0. ]])
+            underestimate_penalty = overestimate_penalty[::-1, ::-1]
+            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid, valid_out
 
-    def build_model(self, model_spec, leak_alpha, pad):
+    def build_model(self, model_spec, leak_alpha, pad, filter_shape):
         print("Building model from JSON...")
         def get_nonlinearity(layer):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
@@ -249,7 +275,9 @@ class VGGNet(object):
             }[layer]
 
         all_layers = [layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
-        all_layers.append(layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
+        if filter_shape == 'c01b':
+            all_layers.append(layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
+        dimshuffle = False if filter_shape == 'c01b' else True
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             if cs["type"] == "CONV":
@@ -262,14 +290,14 @@ class VGGNet(object):
                                     border_mode=border_mode,
                                     W=get_init(cs),
                                     nonlinearity=get_nonlinearity(cs),
-                                    dimshuffle=False))
+                                    dimshuffle=dimshuffle))
                 if cs.get("pool_size"):
                     all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1],
                                         pool_size=(cs["pool_size"], cs["pool_size"]),
                                         stride=(cs["pool_stride"], cs["pool_stride"]),
-                                        dimshuffle=False))
+                                        dimshuffle=dimshuffle))
             elif cs["type"] == "FC":
-                if model_spec[i-1]["type"] == "CONV":
+                if (model_spec[i-1]["type"] == "CONV") and (filter_shape == 'c01b'):
                     all_layers.append(layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
@@ -459,16 +487,25 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  noise_decay_start, noise_decay_duration, noise_decay_severity,
                  valid_flip, test_flip, sample_class, custom_distribution,
                  train_color_cast, valid_color_cast, test_color_cast,
-                 color_cast_range, override_input_size):
+                 color_cast_range, override_input_size, model_file, filter_shape, cache_size_factor):
     runid = "%s-%s-%s" % (str(uuid.uuid4())[:8], network, loss_type)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
         print("[INFO] %.2f current epochs equals 1 BlockDesigner epoch" % ((274.0*numpy.array(custom_distribution)) / numpy.array(ACTUAL_TRAIN_DR_PROPORTIONS))[sample_class])
 
     model_spec, image_shape, pad = load_model_specs(network, as_grey, override_input_size)
+    data_stream = DataStream(train_image_dir=train_dataset, image_shape=image_shape, cache_size_factor=cache_size_factor, batch_size=batch_size, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution, train_color_cast=train_color_cast, valid_color_cast=valid_color_cast, test_color_cast=test_color_cast, color_cast_range=color_cast_range)
 
-    data_stream = DataStream(train_image_dir=train_dataset, batch_size=batch_size, image_shape=image_shape, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution, train_color_cast=train_color_cast, valid_color_cast=valid_color_cast, test_color_cast=test_color_cast, color_cast_range=color_cast_range)
-    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, runid)
+    if model_file:
+        f = open(model_file)
+        batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
+        f.close()
+
+        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, runid=runid)
+        column.restore(model_file)
+    else:
+        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, runid=runid)
+
     try:
         column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
     except KeyboardInterrupt:
@@ -515,4 +552,7 @@ if __name__ == '__main__':
                 valid_color_cast=_.valid_color_cast,
                 test_color_cast=_.test_color_cast,
                 color_cast_range=_.color_cast_range,
-                override_input_size=_.override_input_size)
+                override_input_size=_.override_input_size,
+                model_file=_.model_file,
+                filter_shape=_.filter_shape,
+                cache_size_factor=_.cache_size_factor)

@@ -46,5 +46,11 @@ def get():
                         type=int,
                         default=1664,
                         help="Validation set size (4864=14%, 3456=10%, 1664=5%)")
+    parser.add_argument("-fs",
+                        "--filter-shape",
+                        type=str,
+                        default='c01b',
+                        choices=['c01b', 'bc01'],
+                        help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape).")
 
     return parser.parse_args()

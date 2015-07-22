@@ -46,5 +46,11 @@ def get():
                         "--patch-size",
                         type=int,
                         default=11)
+    parser.add_argument("-fs",
+                        "--filter-shape",
+                        type=str,
+                        default='c01b',
+                        choices=['c01b', 'bc01'],
+                        help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape).")
 
     return parser.parse_args()

@@ -73,10 +73,10 @@ def get():
     parser.add_argument("-L",
                         "--loss-type",
                         type=str,
-                        default="nnrank-re")
+                        default="nnrank-re-kappa-sym")
     parser.add_argument("-P",
                         "--validations-per-epoch",
-                        type=int,
+                        type=float,
                         default=1,
                         help="Number of times to validate and print confusion matrix per epoch.")
     parser.add_argument("-g",
@@ -165,5 +165,20 @@ def get():
                         type=int,
                         default=None,
                         help="Override the size of the image used as reported in network_specs.json.")
+    parser.add_argument("-M",
+                        "--model-file",
+                        type=str,
+                        default=None)
+    parser.add_argument("-fs",
+                        "--filter-shape",
+                        type=str,
+                        default='c01b',
+                        choices=['c01b', 'bc01'],
+                        help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape).")
+    parser.add_argument("-H",
+                        "--cache-size-factor",
+                        type=int,
+                        default=8,
+                        help="The number of multiples of minimatches to store in GPU device memory at once.")
 
     return parser.parse_args()

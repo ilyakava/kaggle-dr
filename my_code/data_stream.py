@@ -99,8 +99,8 @@ class DataStream(object):
     def __init__(self,
                  train_image_dir="data/train/centered_crop/",
                  image_shape=(128, 128, 3),
-                 cache_size=1024,
                  batch_size=128,
+                 cache_size_factor=8,
                  center=0,
                  normalize=0,
                  amplify=1,
@@ -120,8 +120,8 @@ class DataStream(object):
         self.train_image_dir = train_image_dir
         self.test_image_dir = test_image_dir
         self.image_shape = image_shape
-        self.cache_size = cache_size # size in images
         self.batch_size = batch_size
+        self.cache_size = (self.batch_size * cache_size_factor) # size in images
         self.center = center
         self.mean = None
         self.normalize = normalize

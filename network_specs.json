@@ -247,6 +247,182 @@
         "desc": "vgg_mini7b_leak with sigmoid output",
         "trials": []
     },
+    "vgg_tiny7b_leak_sig" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 16, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig but half as wide",
+        "trials": []
+    },
+    "vgg_mini7b_leak_sig_ep" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig with extra pool",
+        "trials": []
+    },
+    "vgg_mini7b_leak_sig_ecp" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig with an extra CONVPOOL layer (ecp = end conv pool)",
+        "trials": []
+    },
+    "vgg_mini10_lp" : {
+        "rec_input_size": 128,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
+        ],
+        "desc": "vgg_mini10 with 1 less pooling layer. vgg_mini8 with an extra conv layer. Numbering jump b/c I just realized the network should count the output layer in its 'N weight layers'",
+        "trials": []
+    },
+    "vgg_mini10" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig_ecp with an extra CONV layer",
+        "trials": []
+    },
+    "vgg_mini11" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini10 with an extra CONV layer",
+        "trials": []
+    },
+    "vgg_mini13" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini10 with an extra CONV layer",
+        "trials": []
+    },
+    "vgg_mini7b_leak_sig_ecp_swap" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig_ecp with non pooling layer placed later",
+        "trials": []
+    },
+    "vgg_tiny7b_leak_sig_ecp" : {
+        "rec_input_size": 192,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig with an extra CONVPOOL layer (ecp = end conv pool) and half as thick",
+        "trials": []
+    },
+    "vgg_tinyer7b_leak_sig_ecp" : {
+        "rec_input_size": 292,
+        "pad": 0,
+        "layers": [
+            { "type": "CONV", "num_filters": 16, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
+            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
+        ],
+        "desc": "vgg_mini7b_leak_sig with an extra CONVPOOL layer (ecp = end conv pool) and half as thick",
+        "trials": []
+    },
     "vgg_mini7b_leak_sig_chan" : {
         "rec_input_size": 128,
         "pad": 0,
@@ -298,23 +474,6 @@
             { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
         ],
         "desc": "vgg_mini7b_leak_sig with batches split",
-        "trials": []
-    },
-    "vgg_mini7b_leak_sig_ecp" : {
-        "rec_input_size": 256,
-        "pad": 0,
-        "layers": [
-            { "type": "CONV", "num_filters": 16, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
-            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
-            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "sigmoid" }
-        ],
-        "desc": "vgg_mini7b_leak_sig with an extra CONVPOOL layer (ecp = end conv pool) and half as thick",
         "trials": []
     },
     "vgg_mini7b_leak_sig_ecp_batches" : {
@@ -385,25 +544,7 @@
         "desc": "vgg_mini7b_leak with an extra conv layer",
         "trials": []
     },
-    "vgg_mini10" : {
-        "rec_input_size": 128,
-        "pad": 0,
-        "layers": [
-            { "type": "CONV", "num_filters": 32, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 64, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 128, "filter_size": 3, "pool_size": 3, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "nonlinearity": "LReLU" },
-            { "type": "CONV", "dropout": 0.1, "num_filters": 256, "filter_size": 3, "pool_size": 2, "pool_stride": 2, "nonlinearity": "LReLU" },
-            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
-            { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
-            { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
-        ],
-        "desc": "vgg_mini8 with an extra conv layer. Numbering jump b/c I just realized the network should count the output layer in its 'N weight layers'",
-        "trials": []
-    },
-    "vgg_mini10_ld" : {
+    "vgg_mini10_lp_ld" : {
         "rec_input_size": 128,
         "pad": 0,
         "layers": [
@@ -418,7 +559,7 @@
             { "type": "FC", "dropout": 0.5, "num_units": 2048, "pool_size": 2, "nonlinearity": "LReLU" },
             { "type": "OUTPUT", "dropout": 0.5, "nonlinearity": "softmax" }
         ],
-        "desc": "vgg_mini10 without dropout on conv layers",
+        "desc": "vgg_mini10_lp without dropout on conv layers",
         "trials": []
     },
     "vgg_mini7b_doub" : {

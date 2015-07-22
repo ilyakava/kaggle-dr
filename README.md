@@ -10,21 +10,18 @@
 
 `sudo pip install theano scikit-learn scikit-image nyanbar natsort`
 
-If `skimage.io` has issues, try: `sudo pop install -U scikit-image`.
+If `skimage.io` has issues, try: `sudo pip install -U scikit-image`.
 
 ### Install Lasange
 
 ```
-git clone https://github.com/Lasagne/Lasagne.git
-cd Lasagne/
-pip install -r requirements.txt
-sudo python setup.py install
+git clone https://github.com/Lasagne/Lasagne.git && cd Lasagne/ && git checkout 4e4f2f4fdefdab6c2634c7ba080dc3e036782378 && pip install -r requirements.txt && sudo python setup.py install && cd ..
 ```
 
 ### Install pylearn2
 
 ```
-git clone git://github.com/lisa-lab/pylearn2.git && cd pylearn2/ && sudo python setup.py develop
+git clone git://github.com/lisa-lab/pylearn2.git && cd pylearn2/ && python setup.py develop && sudo python setup.py develop && cd ..
 ```
 
 #### Create a [~/.theanorc](http://deeplearning.net/software/theano/library/config.html) file
@@ -40,9 +37,12 @@ device = gpu0
 
 [Override with another device via](http://deeplearning.net/software/theano/library/config.html): `THEANO_FLAGS='device=gpu0'` prefix. Get a list of gpus via: `nvidia-smi -L`.
 
-### Clone Code from ciresan and theanet
+Also ensure that something like the following lines are in your `~/.bashrc`:
 
-`git submodule update --init --recursive`
+```
+export PATH=/usr/local/cuda-7.0/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-7.0/lib64:$LD_LIBRARY_PATH
+```
 
 ## Data
 

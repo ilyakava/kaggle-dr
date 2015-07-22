@@ -11,12 +11,15 @@ from my_code.predict import model_runid
 
 import pdb
 
-def conv_weight_image(W,b, filter_enlargement=2, filter_padding=1):
+def conv_weight_image(W,b, filter_enlargement=2, filter_padding=1, filter_shape='c01b'):
     """
     Creates an image from a CONV layer's weights
     """
     # http://lasagne.readthedocs.org/en/latest/modules/layers.html?highlight=conv2dcclayer#lasagne.layers.cuda_convnet.Conv2DCCLayer
-    num_filters, num_input_channels, filter_rows, filter_columns = W.shape
+    if filter_shape == 'c01b':
+        num_input_channels, filter_rows, filter_columns, num_filters = W.shape
+    else:
+        num_filters, num_input_channels, filter_rows, filter_columns = W.shape # bc01
     filt = [w+b_ for w, b_ in zip(W, b)]
     dim_in_filters = int(math.ceil(math.sqrt(num_filters*(num_input_channels)))) # num filters plotted per dimension
     filter_px_size = (filter_rows*filter_enlargement+filter_padding)
@@ -29,7 +32,10 @@ def conv_weight_image(W,b, filter_enlargement=2, filter_padding=1):
             i_px_end = i_px_start + filter_rows*filter_enlargement
             j_px_start = j * filter_px_size
             j_px_end = j_px_start + filter_rows*filter_enlargement
-            img = scipy.misc.toimage(filt[n][m,:,:])
+            if filter_shape == 'c01b':
+                img = scipy.misc.toimage(filt[m][:,:,n])
+            else:
+                img = scipy.misc.toimage(filt[n][m,:,:])
             nd = int(filter_rows*filter_enlargement)
             new_size = nd, nd
             img_3x = img.resize(new_size, Image.NEAREST)
@@ -38,6 +44,10 @@ def conv_weight_image(W,b, filter_enlargement=2, filter_padding=1):
 
 if __name__ == '__main__':
     model_file = sys.argv[1]
+    if len(sys.argv) == 3:
+        filter_shape = sys.argv[2]
+    else:
+        filter_shape = 'c01b'
     runid = model_runid(model_file)
     f = open(model_file)
     # discard first slot
@@ -56,7 +66,7 @@ if __name__ == '__main__':
         W,b = Wb
         imgname = "%s-layer-%i-%s" % (runid, i,'x'.join(numpy.array(W.shape, dtype=str)))
         outpath = 'plots/' + imgname + '.png'
-        layer_img = conv_weight_image(W,b)
+        layer_img = conv_weight_image(W,b, filter_shape=filter_shape)
         scipy.misc.toimage(layer_img).save(outpath, "PNG")
         outpaths.append(outpath)
     for outpath in outpaths:

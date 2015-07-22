@@ -45,6 +45,19 @@ class SampleTrainValTestSet(unittest.TestCase):
             sum(abs(get_proportions(collect) - self.true_proportions) < PROPORTION_ERROR_MARGIN) == self.K
         )
 
+    def test_skipping_classes(self):
+        X, y = self.samp.custom_distribution(0, 128, [64,64,0,0,0])
+
+        collect = {}
+        for k in set(y):
+            collect[k] = []
+        for i, klass in enumerate(y):
+            collect[klass].append(X[i])
+
+        self.failUnless(
+            sum(abs(get_proportions(collect) - numpy.array([0.5, 0.5])) < PROPORTION_ERROR_MARGIN) == 2
+        )
+
 def main():
   unittest.main()
 

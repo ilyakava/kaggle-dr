@@ -145,4 +145,5 @@ if __name__ == '__main__':
            train_flip=_.train_flip,
            test_dataset=None,
            random_seed=_.random_seed,
-           valid_dataset_size=_.valid_dataset_size)
+           valid_dataset_size=_.valid_dataset_size,
+           filter_shape=_.filter_shape)

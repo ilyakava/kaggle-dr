@@ -9,3 +9,4 @@ data/*
 *.png
 *.gz
 *.csv
+*.xlsx
