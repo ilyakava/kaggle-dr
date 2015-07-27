@@ -22,6 +22,13 @@ def save_prediction(runid, img_names, labels):
         for i in xrange(len(img_names)):
             writer.writerow([img_names[i],labels[i]])
 
+def save_raw_out(runid, mat):
+    name = './results/'+runid+'-rawout.pkl'
+    print("Saving %s" % name)
+    f = open(name, 'wb')
+    cPickle.dump(mat, f, -1)
+    f.close()
+
 def model_runid(model_file):
     return path.splitext(path.basename(model_file))[0].split('-')[0]
 
@@ -45,6 +52,7 @@ def single(model_file, **kwargs):
     try:
         all_test_predictions, all_test_output = column.test()
         save_prediction(runid, column.ds.test_dataset['X'], all_test_predictions)
+        save_raw_out(runid, all_test_output)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Testing"
     print(time.strftime("Finished at %H:%M:%S on %Y-%m-%d"))
