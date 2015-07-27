@@ -21,7 +21,7 @@ git clone https://github.com/Lasagne/Lasagne.git && cd Lasagne/ && git checkout 
 ### Install pylearn2
 
 ```
-git clone git://github.com/lisa-lab/pylearn2.git && cd pylearn2/ && python setup.py develop && sudo python setup.py develop && cd ..
+git clone git://github.com/lisa-lab/pylearn2.git && cd pylearn2/ && git checkout 04c77eb9998c9dad1f2efa020736989005cd9c98 && python setup.py develop && sudo python setup.py develop && cd ..
 ```
 
 #### Create a [~/.theanorc](http://deeplearning.net/software/theano/library/config.html) file
@@ -64,7 +64,7 @@ Place `trainLabels.csv` into `data/train`
 
 ### Preparing Data for the Network
 
-#### Full Size Originals -> Smaller Originals (~2.5 images per second)
+#### Full Size Originals -> Smaller Originals (~2.5 images per second on single CPU)
 
 (Ex) This will create 3 batchfiles for graphicsmagick to output 128x128 pngs:
 
@@ -77,7 +77,55 @@ Then follow the on screen directions, which will list what commands to run to pr
 
 Depending on how your CPU schedules, more than 1 batchfile may not result in any speedup (3 is the best size for me however).
 
-#### Alignment (~3 seconds per image)
+## The Network
+
+### Training the network
+
+#### Easiest to train
+
+`python -m my_code.VGGNet -x 160`
+
+#### My 2nd best Network (Kappa ~0.72)
+
+`python -m my_code.VGGNet -d data/train/cent_crop_192/ -n vgg_mini7b_leak_sig_ecp -x 200`
+
+#### My best Network (Kappa ~0.74)
+
+`python -m my_code.VGGNet -d data/train/cent_crop_256/ -n vgg_mini7b_leak_sig_ecp -x 200`
+
+#### Seeing Validation Kappa/Error over time
+
+`python -m my_code.plot_results -f results/best_results.pkl`
+
+### Testing a single network
+
+`python -m my_code.predict -M models/modelfile.pkl -D data/test/cent_crop_192/`
+
+*This command will print out where it saves a *.csv file submittable to Kaggle, as well as a *.pkl file containing the network's raw outputs, ready to be ensembled with other raw outputs.*
+
+### Combining/Ensembling test output
+
+`python -m my_code.avg_raw_ouputs results/my_2nd_best.pkl,results/my_1st_best.pkl`
+
+*Combine "My 2nd best Network" with "My best Network" to get a Kappa ~0.76*
+
+### Comparing csvs for overlap
+
+`python -m my_code.compare_csv data/train/trainLabels.csv results/result1.csv`
+
+# Misc
+
+## Running tests
+
+`make test`
+
+## Getting Help
+
+- [SO](http://stackoverflow.com/questions/tagged/neural-network)
+- [DataScience Beta](http://datascience.stackexchange.com/questions/tagged/deep-learning)
+- [CrossValidated](http://stats.stackexchange.com/questions/tagged/deep-learning)
+
+## Image Alignment (~3 seconds per image)
 
 To reduce noise in the training dataset, detect which images are inverted (taken with an indirect ophthalmoscope) and which are left/right, and invert the images until optic nerve is on the right side of the image.
 
@@ -91,22 +139,3 @@ This will run the ith of n partitions that creates a csv of which inversions to 
 
 In three different `screen` sessions for parallel processing. Each will report having created a csv file. You can join these multiple csvs into one with: `awk 'FNR==1 && NR!=1{next;}{print}' *.csv > my.csv`
 
-## The Network
-
-### Training the network
-
-`python -m my_code.VGGNet`
-
-### Testing a single network
-
-`python -m my_code.predict`
-
-# Running tests
-
-`make test`
-
-# Getting Help
-
-- [SO](http://stackoverflow.com/questions/tagged/neural-network)
-- [DataScience Beta](http://datascience.stackexchange.com/questions/tagged/deep-learning)
-- [CrossValidated](http://stats.stackexchange.com/questions/tagged/deep-learning)

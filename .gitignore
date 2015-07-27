@@ -10,3 +10,4 @@ data/*
 *.gz
 *.csv
 *.xlsx
+*.html
