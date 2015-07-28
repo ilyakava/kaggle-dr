@@ -12,7 +12,7 @@ competition was to predict the presence and severity of the disease [Diabetic Re
 Diabetic Retinopathy (DR) is one of the most significant complications of diabetes and is a leading cause of blindness. Early detection and treatment is essential for preventing blindness. Ophthalmologists can use a [lens](https://en.wikipedia.org/wiki/Ophthalmoscopy) to look through the dilated pupils of a patient and see the retina at the back of the eyeball, looking for symptoms that indicate changes in blood vessels ([NIH][NIH]). At worst this means that new blood vessels are growing (proliferative DR or PDR) and disturbing the retina, otherwise the patient has non-proliferative DR (NPDR). For the challenge, there are 5 stages of DR severity that have symptoms (from [here](http://www.icoph.org/downloads/Diabetic-Retinopathy-Scale.pdf)):
 
 0. non-pathological, no NPDR
-1. Mild NPDR, microanuerisms (red blotches) which are the source of hard exudate (high contrast yellow spots) sometimes in circulate patterns
+1. Mild NPDR, microaneurysms (red blotches) which are the source of hard exudate (high contrast yellow spots) sometimes in circulate patterns
 2. Moderate NPDR. "More than just microaneurysms," perhaps cotton wool spots (fuzzy light blotches)
 3. Severe NPDR: IRMA (shunt vessels), venous bleeding in 2+ quadrants, 20+ intra-retinal hemorrhages, no signs PDR
 4. Neovascularization (often vessels with loops or very squiggly vessels), vitreous/preretinal hemorrhage, PDR
@@ -23,7 +23,7 @@ The goal of the competition is to build a classifier that takes in these images,
 
 ## My Approach: Convnets
 
-![**A ConvNet correctly predicts class 2** *This plot shows the original 128x128 training image (41188_right) with four heatmaps. Each heatmap corresponds to one of four pathological classes. Each pixel in the heatmap represents the probability that that class is true given that pixel is corrupted in the original image. The heatmaps were created by moving around a 11x11 pixel block which hid a region of the image at testing time. The low probability areas (blue) mean that without those pixels that class would not be predicted. Here the network has learned to find the subtle hard exudate and (less so) cotton wool spots indicate classes 1 and 2 (since those classes would not be likely if those areas were obfuscated).*](http://f.cl.ly/items/0s3D1G2J402n2y1s0F0P/modelX_41188_right.png)
+![**A ConvNet correctly predicts class 2** *This plot shows the original 128x128 training image (41188_right) with four heatmaps. Each heatmap corresponds to one of four pathological classes. Each pixel in the heatmap represents the probability that that class is true given that pixel is corrupted in the original image. [The heatmaps were created](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/plot_occluded_activations.py#L19) by moving around a 11x11 pixel block which hid a region of the image at testing time. The low probability areas (blue) mean that without those pixels that class would not be predicted. Here the network has learned to find the subtle hard exudate and (less so) cotton wool spots indicate classes 1 and 2 (since those classes would not be likely if those areas were obfuscated).*](http://f.cl.ly/items/0s3D1G2J402n2y1s0F0P/modelX_41188_right.png)
 
 Since my last [Machine Learning class](http://www.cs.columbia.edu/~jebara/4772/), I've been looking forward to using ConvNets because of the promise of end-to-end learning: learning a feature extractor and a classifier simultaneously. This property allows accurate classifiers to be created without much domain knowledge. So in May, I read through a [Stanford tutorial][karpathy] and [Columbia reading list](http://llcao.net/cu-deeplearning15/reading.html) and toured [theano](http://deeplearning.net/software/theano/) while [implementing the best performing ConvNet on MNIST](http://github.com/ilyakava/ciresan). After that, I moved onto the more challenging DR dataset, with guidance from Sander Dieleman's posts on his two Kaggle ConvNet wins: classifying [galaxies][galaxy] and [plankton][plankton].
 
@@ -32,6 +32,8 @@ Since my last [Machine Learning class](http://www.cs.columbia.edu/~jebara/4772/)
 I used same software setup as [Sander Dieleman in his Galaxy post][galaxy]. For details see my [repo][GH]. For hardware, I had access to a Nvidia M2090 with 6Gb RAM, and at the last moment a K40. Because of these assumptions, I use the `lasagne.layers.cuda_convnet` module which requires a GPU to run.
 
 Of the networks I include, [128x128 runs](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L183) (kappa ~0.68) took me 3.5 mins/epoch, [192x192 runs](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L282) (kappa ~0.72) took 7.8 mins/epoch, and [256x256 runs](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L282) (kappa ~0.74) took 14 mins/epoch.
+
+![Adding resolution provided huge gains, as seen in these validation errors for runs 120 through 162 (run descriptions in Misc section at end). A whole new cliff of lower errors is discovered simply by using larger images!](http://i.imgur.com/TA0prdQ.png)
 
 # Preprocessing
 
@@ -51,6 +53,8 @@ For input into the network, histogram normalization with [graphicsmagick](http:/
 
 ## Exploiting Invariances by adding Noise
 
+![Adding random flipping and color casting noise was essential to delay overfitting and continue decaying the error, as seen in the validation error of runs 40 through 120 plotted here (run descriptions in Misc section at end). Notice how the earlier runs are bowl shaped while later runs are a cliff: adding color deepens the bowl, a custom error function widens it, but adding noise to the dataset turns it into a cliff.](http://i.imgur.com/uuXa96B.png)
+
 ### [Flipping](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L15)
 
 I randomly flipped/didn't flip an image along the horizontal axis, and then again for the vertical axis every time it entered the network. I liked that this transformation didn't change the image quality or the appearance of the letterbox which was generally symmetric. I didn't try rotating the eyeball a random degree because of the potential extra delay when loading the image into the network (and also because I feared the rotated letterbox might add harmful noise to the dataside), but given more time I would have tried this.
@@ -65,7 +69,7 @@ I first heard about this from a [paper out of Baidu](http://arxiv.org/abs/1501.0
 
 Early on, I had the belief that any reduction in noise in the training set would improve my convergence. For this reason, I decided to align all the training set images. Some images display a tab jutting out of the eyeball in the right half of the image. When this is the case, this means the image is [inverted](http://www.olympusmicro.com/primer/images/magnification/convexlens3.jpg). I wrote a pattern recognition style [tab detector](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/align_util.py#L114) that with 90% accuracy would detect this tab, and with the additional information of right/left eye from the image name, would output the flip that would put the optic nerve in the right of the image.
 
-![A sample of 115 images after alignment, most of the time the optic nerve is on the right.](http://f.cl.ly/items/2Z1t251X0a2D1Y442w3s/unnamed.gif)
+![A sample of 115 images after alignment, most of the time the optic nerve is on the right.](http://i.imgur.com/4nzDAHx.gif)
 
 This pre-alignment gave a 1% improvement over the same run with the images oriented as they are found in the training set. However random flipping provided a 10% benefit, so this work did not prove useful.
 
@@ -73,7 +77,7 @@ This pre-alignment gave a 1% improvement over the same run with the images orien
 
 After some experiments I started to believe that for ConvNets, adding the right kind of noise prevents overfitting by roughening the error surface of the network, and lowering the energy barriers to hop out of bad local minima. I thought that by having high noise in the beginning of training, and less noise at the end, I would have the advantage of getting out of bad local minima early on, and being able to stay in good minima later on in training.
 
-So I tried decaying the amount of noise: randomly flipping pre-aligned images less often as training progressed. I was surprised to find that shortly after every time I reduced the noise, my network began to overfit. I rationalized this as me reducing the amount of data (total uniq images) that the net had access to over time.
+So I tried decaying the amount of noise: randomly flipping pre-aligned images less often as training progressed. I was surprised to find that shortly after every time I reduced the noise, my network began to overfit. I rationalized this as me reducing the amount of data (total unique images) that the net had access to over time.
 
 # [Network Architecture](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L183)
 
@@ -102,15 +106,15 @@ I tried several variations, all of which are in my [`network_specs.json`](https:
 | FC-4                    | (128, 4)                      |
 | sigmoid                 |                               |
 
-This network had [21.66 million parameters](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L101) and used up almost all of my availble 12Gb of GPU RAM. This same network with an input image of size 192x192 would fit in 6Gb of GPU RAM. Each convolutional layer (except the first) has dropout with *p=0.1*, and every convolutional layer has an LReLu non-linearity, and each FC layer has dropout with *p=0.5*.
+This network had [21.66 million parameters](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L101) and used up almost all of my available 12Gb of GPU RAM. This same network with an input image of size 192x192 would fit in 6Gb of GPU RAM. Each convolutional layer (except the first) has dropout with *p=0.1*, and every convolutional layer has an LReLu non-linearity, and each FC layer has dropout with *p=0.5*.
 
 The other successful network in [`network_specs.json`](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L387) is similar, but would take smaller input images, and has 1 fewer convolution layer.
 
-The initial network decisions were made with the help of [Stanford tutorial][karpathy].
+The initial network decisions were made with the help of the [Stanford tutorial][karpathy]. Given more time, I would have experimented with larger filters on larger images (3x3 filters were best on 128x128 images), as well as larger overlaps in the pooling to [preserve spatial information](https://www.reddit.com/r/MachineLearning/comments/2lmo0l/ama_geoffrey_hinton/clyj4jv).
 
 ## Parameter Sharing Attempts
 
-I tried the same solution Sander Dieleman did in his [plankton][plankton] challenge: splitting the image into quarters, running each quarter through the convolutional layers independently, and then connecting the features from the four quarters to the same series of 3 FC layers. I called this [`Fold4xBatchesLayer`](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/layers.py#L23) in the code because the pixels are being folded across the batch dimension in the 4D input data tensor. This marginally worsened results. Given more time, I would have combined this folding pixels across batches with the prealignment strategy.
+I tried the same solution Sander Dieleman did in his [plankton][plankton] challenge: splitting the image into quarters, running each quarter through the convolutional layers independently, and then connecting the features from the four quarters to the same series of 3 FC layers. I called this [`Fold4xBatchesLayer`](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/layers.py#L23) in the code because the pixels are being folded across the batch dimension in the 4D input data tensor. This marginally worsened results. Given more time, I would have combined this folding pixels across batches with the pre-alignment strategy.
 
 I also tried a similar strategy but with [folding pixels across channels](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/layers.py#L8), which led to a considerable runtime speedup but 10% worse performance.
 
@@ -120,7 +124,7 @@ I would have also liked to try sharing parameters between pairs of images (left 
 
 I started by using the same error function I did for MNIST: [categorical cross entropy](http://lasagne.readthedocs.org/en/latest/modules/objectives.html?highlight=entropy#lasagne.objectives.categorical_crossentropy). This has the downside of not encoding any information that the classes are ordinal (4>3>2>1>0 in the severity of DR) and not differentiating between errors of different magnitudes (unlike the metric that the competition is judged on).
 
-For this reason I followed the advice on the [Kaggle forums](https://www.kaggle.com/c/diabetic-retinopathy-detection/forums/t/13115/paper-on-using-ann-for-ordinal-problems) and used an nn-rank target matrix with relative entropy as described in [this paper](https://web.missouri.edu/~zwyw6/files/rank.pdf). This resulted in the [following target matrix](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L171) for a four node ouput network:
+For this reason I followed the advice on the [Kaggle forums](https://www.kaggle.com/c/diabetic-retinopathy-detection/forums/t/13115/paper-on-using-ann-for-ordinal-problems) and used an nn-rank target matrix with relative entropy as described in [this paper](https://web.missouri.edu/~zwyw6/files/rank.pdf). This resulted in the [following target matrix](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L171) for a four node output network:
 
 ```
 [
@@ -144,7 +148,7 @@ instead of the standard ["one-hot" target matrix](https://github.com/ilyakava/ka
 ]
 ```
 
-I also tried an nn-rank target matrix with a 5 node output, but did not get superiour results.
+I also tried an nn-rank target matrix with a 5 node output, but did not get superior results.
 
 ## Variants
 
@@ -160,9 +164,9 @@ To emphasize gross errors, I [modified the target matrix](https://github.com/ily
 ]
 ```
 
-When I tried matricies that were [more steep](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L214) (concentrated most of the weight on more discrepant label-prediction pairs), I noticed that the network made fewer underestimates, and more overestimates. I saw the opposite effect as I tried [more flat matricies](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L196) (somewhere between the last one shown and the binary nn-rank target matrix). The best performing target matrix I tried is shown here and comes from the code [here](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L205).
+When I tried matrices that were [more steep](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L214) (concentrated most of the weight on more discrepant label-prediction pairs), I noticed that the network made fewer underestimates, and more overestimates. I saw the opposite effect as I tried [more flat matrices](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L196) (somewhere between the last one shown and the binary nn-rank target matrix). The best performing target matrix I tried is shown here and comes from the code [here](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L205).
 
-If I had more time, my next step would have been to experiment directly with exagerating the underestimate penalty and under-emphasizing the overestimate penalty to exert more control over the false-negative <-> false-positive tradeoff.
+If I had more time, my next step would have been to experiment directly with exaggerating the underestimate penalty and under-emphasizing the overestimate penalty to exert more control over the false-negative <-> false-positive tradeoff.
 
 # Training/Optimization
 
@@ -188,6 +192,10 @@ Decaying the learning rate after the validation error stalled for 3 consecutive 
 
 Very few experiments were run with [L1](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L173) and [L2](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L177) regularization. L1 always did considerable damage, and L2 didn't seem to help. With more time, I would have explore this.
 
+### Dropout
+
+![Dropout was essential for the network to even train for long. This plot shows the validation error on runs 14 through 40 in the summary (run descriptions in Misc section at end). Before GlorotUniform, the error was a totally flat line at 1. Adding dropout and pooling prevented the overfitting seen in GlorotUniform, and overlapping pooling led to a quicker error drop.](http://i.imgur.com/z3mBqVM.png)
+
 ## [Ensemble](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/avg_raw_outputs.py#L18)
 
 I got about 1 to 2% improvements when I averaged the raw outputs of several networks (last 4 nodes after the nonlinearity for each example) and then made my prediction.
@@ -198,25 +206,33 @@ I got about 1 to 2% improvements when I averaged the raw outputs of several netw
 
 *Numbers correspond to the experiment number in the first summary graph that each cumulative change corresponds to.*
 
-13. vgg_mini7
-14. GlorotUniform Init
-16. All Conv dropout
-18. Both FC pooling
-19. 1 more FC dropout
-21. Overlap Pooling
-40. LReLu
-55. [controlled batch distributions](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/block_designer.py#L8)
-80. [nnrank-re](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L171)
-83. color
-91. 4 outputs
-93. [random flips](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L15)
-120. ±20 [color cast](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L69)
-122. ±30 color cast
-136. [kappa weighted error func](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L205)
-149. 152px
-151. 192px + extra Pool
-152. 192px + extra ConvPool
-162. 256px
+
+- run 13: vgg_mini7
+- run 14: GlorotUniform Init
+- run 16: All Conv dropout
+- run 18: Both FC pooling
+- run 19: 1 more FC dropout
+- run 21: Overlap Pooling
+- run 40: LReLu
+- run 55: [controlled batch distributions](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/block_designer.py#L8)
+- run 80: [nnrank-re](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L171)
+- run 83: color
+- run 91: 4 outputs
+- run 93: [random flips](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L15)
+- run 120: ±20 [color cast](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L69)
+- run 122: ±30 color cast
+- run 136: [kappa weighted error func](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L205)
+- run 149: 152px
+- run 151: 192px + extra Pool
+- run 152: 192px + extra ConvPool
+- run 162: 256px
+
+
+![Runs 14 through 40](http://i.imgur.com/aCPLFmJ.png)
+
+![Runs 40 through 120](http://i.imgur.com/nIuwrI3.png)
+
+![Runs 120 through 162](http://i.imgur.com/Mqqsgi1.png)
 
 ## [Dealing with Class Imbalance](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/sampler.py#L26)
 
@@ -234,7 +250,13 @@ Thinning out the CONV layers led to 2 to 3% worse performance, but could reduce 
 
 # Conclusion
 
-I had a lot of fun, and am thankful to Kaggle and the Sponsors for making such an exciting and challenging dataset available. Next steps for me will be experimenting with even larger images (I [had trouble](https://groups.google.com/d/msg/pylearn-users/vjtyydH8T8w/96Hgeee61gcJ) above 256px with my current setup), writing my own Cuda code for fun and potential performance gains, and maybe experimenting with other frameworks.
+I had a lot of fun, and am thankful to Kaggle and the Sponsors for making such an exciting and challenging dataset available, as well as the open source authors behind theano, Lasagne, and pylearn2. Next steps for me will be experimenting with even larger images (I [had trouble](https://groups.google.com/d/msg/pylearn-users/vjtyydH8T8w/96Hgeee61gcJ) above 256px with my current setup), writing my own Cuda code for fun and potential performance gains, learning how to parallelize across multiple GPUs, and maybe experimenting with other frameworks.
+
+# Links
+
+- [HN](https://news.ycombinator.com/item?id=9959569)
+- [r/MachineLearning](https://www.reddit.com/r/MachineLearning/comments/3ev1qu/my_1st_kaggle_convnet_getting_to_3rd_percentile/)
+- [Kaggle](https://www.kaggle.com/c/diabetic-retinopathy-detection/forums/t/15589/my-experience-writeup)
 
 [GH]: https://github.com/ilyakava/kaggle-dr
 [galaxy]: http://benanne.github.io/2014/04/05/galaxy-zoo.html
