@@ -16,9 +16,9 @@ import theano
 import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
-import lasagne
-# from lasagne import layers, lasagne.nonlinearities
-# from lasagne.nonlinearities import LeakyRectify
+import lasagne as L
+# from lasagne import layers, L.nonlinearities
+# from L.nonlinearities import LeakyRectify
 # this repo
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
@@ -47,19 +47,19 @@ class VGGNet(object):
         self.runid = runid
 
         if cuda_convnet:
-            import lasagne.layers.cuda_convnet # will crash if theano device is not the GPU
-            self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer
-            self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer
+            import L.layers.cuda_convnet # will crash if theano device is not the GPU
+            self.convOp = L.layers.cuda_convnet.Conv2DCCLayer
+            self.maxOp = L.layers.cuda_convnet.MaxPool2DCCLayer
         else:
-            self.convOp = lasagne.layers.Conv2DLayer
-            self.maxOp = lasagne.layers.MaxPool2DLayer
+            self.convOp = L.layers.Conv2DLayer
+            self.maxOp = L.layers.MaxPool2DLayer
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
-        self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
+        self.x_buffer = theano.shared(L.utils.floatX(self.x_buffer))
         self.y_buffer = T.cast(theano.shared(self.y_buffer), 'int32')
         # validation set is not buffered
         valid_x, self.valid_y = self.ds.valid_set()
-        valid_x = theano.shared(lasagne.utils.floatX(valid_x))
+        valid_x = theano.shared(L.utils.floatX(valid_x))
         self.valid_y = T.cast(theano.shared(self.valid_y), 'int32')
         # network setup
         self.all_layers = self.build_model(model_spec, leak_alpha, pad, filter_shape)
@@ -76,9 +76,9 @@ class VGGNet(object):
         y_batch = T.ivector('y')
         batch_slice = slice(cache_block_index * self.batch_size, (cache_block_index + 1) * self.batch_size)
 
-        self.params = lasagne.layers.get_all_params(self.all_layers[-1])
+        self.params = L.layers.get_all_params(self.all_layers[-1])
         loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type)
-        updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
+        updates = L.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
 
         print("Compiling...")
 
@@ -117,11 +117,11 @@ class VGGNet(object):
         for i in range(1,len(self.all_layers)):
             l = self.all_layers[i]
             p = self.all_layers[i-1]
-            if type(l) is lasagne.layers.dense.DenseLayer:
+            if type(l) is L.layers.dense.DenseLayer:
                 memory += l.output_shape[-1]
                 widths.append(l.output_shape[-1])
                 weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1]) # after 2nd dimshuffle, i.e. bc01 no matter what
-            elif type(l) is lasagne.layers.pool.FeaturePoolLayer:
+            elif type(l) is L.layers.pool.FeaturePoolLayer:
                 memory += l.output_shape[-1]
             elif type(l) is self.convOp:
                 memory += numpy.prod(l.output_shape[_c01])
@@ -152,18 +152,18 @@ class VGGNet(object):
                 # TODO do better than a shared threshold
                 pred_valid = T.sum(T.gt(valid_out, 0.5), axis=1)
             klass_targets = nnrank_target
-        return(theano.shared(lasagne.utils.floatX((klass_targets))),pred_valid)
+        return(theano.shared(L.utils.floatX((klass_targets))),pred_valid)
 
     def build_loss_predictions(self, X, y, output, loss_type, K=5):
-        train_out = lasagne.layers.get_output(output, X)
-        valid_out = lasagne.layers.get_output(output, X, deterministic=True)
+        train_out = L.layers.get_output(output, X)
+        valid_out = L.layers.get_output(output, X, deterministic=True)
         klass_targets, pred_valid = self.build_target_label_prediction(valid_out, loss_type, K)
         target = klass_targets[y]
         if re.search('re', loss_type): # relative entropy
             loss_valid = -T.mean(T.sum(target*T.log(valid_out) + (1-target)*T.log(1-valid_out), axis=1))
 
         if loss_type == 'one-hot': # requires that y has no more than self.num_output_classes classes
-            objective = lasagne.objectives.Objective(output, loss_function=lasagne.objectives.categorical_crossentropy)
+            objective = L.objectives.Objective(output, loss_function=L.objectives.categorical_crossentropy)
             loss_train = objective.get_loss(X, target=y)
             loss_valid = objective.get_loss(X, target=y, deterministic=True)
         elif (loss_type == 'one-hot-ce') and (self.num_output_classes == K): # cross entropy
@@ -206,8 +206,8 @@ class VGGNet(object):
             d = numpy.sqrt(abs(dx - dy))
             overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + (numpy.sum(numpy.triu(d[:,1:]), axis=1)/(numpy.arange(K)[::-1]+numpy.spacing(1))).reshape((5,1)))
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
-            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
-            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            overestimate_penalty = theano.shared(L.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(L.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         elif (loss_type == 'nnrank-re-kappa-sym') and (self.num_output_classes == K-1):
             dx = numpy.ones((K,1)) * numpy.arange(K)
@@ -215,8 +215,8 @@ class VGGNet(object):
             d = abs(dx - dy)
             overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + (numpy.sum(numpy.triu(d[:,1:]), axis=1)/(numpy.arange(K)[::-1]+numpy.spacing(1))).reshape((5,1)))
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
-            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
-            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            overestimate_penalty = theano.shared(L.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(L.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         elif (loss_type == 'nnrank-re-poly2kappa-sym') and (self.num_output_classes == K-1):
             dx = numpy.ones((K,1)) * numpy.arange(K)
@@ -224,8 +224,8 @@ class VGGNet(object):
             d = abs(dx - dy) + (dx - dy)**2
             overestimate_penalty = numpy.triu(d[:,1:]) / (numpy.spacing(1) + (numpy.sum(numpy.triu(d[:,1:]), axis=1)/(numpy.arange(K)[::-1]+numpy.spacing(1))).reshape((5,1)))
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
-            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
-            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            overestimate_penalty = theano.shared(L.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(L.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         elif (loss_type == 'nnrank-re-custkappa-sym') and (self.num_output_classes == K-1):
             # target(3,4) + poly2 hybrid
@@ -235,8 +235,8 @@ class VGGNet(object):
                                                 [ 0. ,  0. ,  0. ,  1. ],
                                                 [ 0. ,  0. ,  0. ,  0. ]])
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
-            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
-            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            overestimate_penalty = theano.shared(L.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(L.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         elif (loss_type == 'nnrank-re-cust2kappa-sym') and (self.num_output_classes == K-1):
             # kappa(3,4), poly2 hybrid
@@ -246,8 +246,8 @@ class VGGNet(object):
                                                 [ 0. ,  0. ,  0. ,  1. ],
                                                 [ 0. ,  0. ,  0. ,  0. ]])
             underestimate_penalty = overestimate_penalty[::-1, ::-1]
-            overestimate_penalty = theano.shared(lasagne.utils.floatX((overestimate_penalty)))
-            underestimate_penalty = theano.shared(lasagne.utils.floatX((underestimate_penalty)))
+            overestimate_penalty = theano.shared(L.utils.floatX((overestimate_penalty)))
+            underestimate_penalty = theano.shared(L.utils.floatX((underestimate_penalty)))
             loss_train = -T.mean(T.sum((underestimate_penalty[y])*T.log(train_out) + (overestimate_penalty[y])*T.log(1-train_out), axis=1))
         else:
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
@@ -259,20 +259,20 @@ class VGGNet(object):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
             req = layer.get("nonlinearity") or default_nonlinear
             return {
-                "LReLU": lasagne.nonlinearities.LeakyRectify(1./leak_alpha),
+                "LReLU": L.nonlinearities.LeakyRectify(1./leak_alpha),
                 "None": None,
-                "sigmoid": lasagne.nonlinearities.sigmoid,
-                "ReLU": lasagne.nonlinearities.rectify,
-                "softmax": lasagne.nonlinearities.softmax,
-                "tanh": lasagne.nonlinearities.tanh
+                "sigmoid": L.nonlinearities.sigmoid,
+                "ReLU": L.nonlinearities.rectify,
+                "softmax": L.nonlinearities.softmax,
+                "tanh": L.nonlinearities.tanh
             }[req]
         def get_init(layer):
             default_init = "GlorotUniform" # for both Conv2DLayer and DenseLayer (Conv2DCCLayer is None)
             req = layer.get("init") or default_init
             return {
-                "Normal": lasagne.init.Normal(),
-                "Orthogonal": lasagne.init.Orthogonal(gain='relu'),
-                "GlorotUniform": lasagne.init.GlorotUniform()
+                "Normal": L.init.Normal(),
+                "Orthogonal": L.init.Orthogonal(gain='relu'),
+                "GlorotUniform": L.init.GlorotUniform()
             }[req]
         def get_custom(layer):
             return {
@@ -290,7 +290,7 @@ class VGGNet(object):
             if cs["type"] == "CONV":
                 border_mode = 'full' if pad else 'valid'
                 if cs.get("dropout"):
-                    all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
+                    all_layers.append(L.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
                 all_layers.append(self.convOp(all_layers[-1],
                                     num_filters=cs["num_filters"],
                                     filter_size=(cs["filter_size"], cs["filter_size"]),
@@ -307,7 +307,7 @@ class VGGNet(object):
                 if (model_spec[i-1]["type"] == "CONV") and (filter_shape == 'c01b'):
                     all_layers.append(layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
                 if cs.get("dropout"):
-                    all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
+                    all_layers.append(L.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
                 all_layers.append(layers.DenseLayer(all_layers[-1],
                                    num_units=cs["num_units"],
                                    W=get_init(cs),
@@ -316,7 +316,7 @@ class VGGNet(object):
                     all_layers.append(layers.FeaturePoolLayer(all_layers[-1], cs["pool_size"]))
             elif cs["type"] == "OUTPUT":
                 if cs.get("dropout"):
-                    all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
+                    all_layers.append(L.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
                 all_layers.append(layers.DenseLayer(all_layers[-1],
                                    num_units=self.num_output_classes,
                                    W=get_init(cs),
@@ -340,7 +340,7 @@ class VGGNet(object):
         all_test_predictions = -numpy.ones(n_test_examples, dtype=int)
         all_test_output = -numpy.ones((n_test_examples, self.num_output_classes))
         for x_cache_block, example_idxs in test_buffer():
-            self.x_buffer.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
+            self.x_buffer.set_value(L.utils.floatX(x_cache_block), borrow=True)
 
             for i in xrange(self.batches_per_cache_block):
                 batch_slice = slice(i * self.batch_size, (i + 1) * self.batch_size)
@@ -363,7 +363,7 @@ class VGGNet(object):
         self.decay_flip_noise(noise_decay_start, noise_decay_duration, noise_decay_severity)
         self.decay_learning_rate(decay_patience, decay_factor, decay_limit)
         for x_cache_block, y_cache_block in self.ds.train_buffer(self.flip_noise):
-            self.x_buffer.set_value(lasagne.utils.floatX(x_cache_block), borrow=True)
+            self.x_buffer.set_value(L.utils.floatX(x_cache_block), borrow=True)
             self.y_buffer.set_value(y_cache_block, borrow=True)
 
             for i in xrange(self.batches_per_cache_block):
@@ -452,7 +452,7 @@ class VGGNet(object):
         f = open('./models/'+name+'.pkl', 'wb')
         cPickle.dump(self.column_init_args, f, -1)
         # only need to save last layer params to restore them later
-        cPickle.dump(lasagne.layers.get_all_param_values(self.all_layers[-1]), f, -1)
+        cPickle.dump(L.layers.get_all_param_values(self.all_layers[-1]), f, -1)
         f.close()
 
     def restore(self, filepath):
@@ -464,7 +464,7 @@ class VGGNet(object):
                 all_saves.append(cPickle.load(f))
             except EOFError:
                 break
-        lasagne.layers.set_all_param_values(self.all_layers[-1], all_saves[-1])
+        L.layers.set_all_param_values(self.all_layers[-1], all_saves[-1])
         f.close()
 
 def save_results(filename, multi_params):
