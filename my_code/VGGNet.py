@@ -17,8 +17,8 @@ import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 import lasagne
-# from lasagne import layers, nonlinearities
-from lasagne.nonlinearities import LeakyRectify
+# from lasagne import layers, lasagne.nonlinearities
+# from lasagne.nonlinearities import LeakyRectify
 # this repo
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
@@ -48,9 +48,8 @@ class VGGNet(object):
 
         if cuda_convnet:
             import lasagne.layers.cuda_convnet # will crash if theano device is not the GPU
-        pdb.set_trace()
-        self.convOp = layers.cuda_convnet.Conv2DCCLayer if cuda_convnet else layers.Conv2DLayer
-        self.maxOp = layers.cuda_convnet.MaxPool2DCCLayer if cuda_convnet else layers.MaxPool2DLayer
+        self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer if cuda_convnet else lasagne.layers.Conv2DLayer
+        self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer if cuda_convnet else lasagne.layers.MaxPool2DLayer
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
@@ -115,11 +114,11 @@ class VGGNet(object):
         for i in range(1,len(self.all_layers)):
             l = self.all_layers[i]
             p = self.all_layers[i-1]
-            if type(l) is layers.dense.DenseLayer:
+            if type(l) is lasagne.layers.dense.DenseLayer:
                 memory += l.output_shape[-1]
                 widths.append(l.output_shape[-1])
                 weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1]) # after 2nd dimshuffle, i.e. bc01 no matter what
-            elif type(l) is layers.pool.FeaturePoolLayer:
+            elif type(l) is lasagne.layers.pool.FeaturePoolLayer:
                 memory += l.output_shape[-1]
             elif type(l) is self.convOp:
                 memory += numpy.prod(l.output_shape[_c01])
@@ -257,12 +256,12 @@ class VGGNet(object):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
             req = layer.get("nonlinearity") or default_nonlinear
             return {
-                "LReLU": LeakyRectify(1./leak_alpha),
+                "LReLU": lasagne.nonlinearities.LeakyRectify(1./leak_alpha),
                 "None": None,
-                "sigmoid": nonlinearities.sigmoid,
-                "ReLU": nonlinearities.rectify,
-                "softmax": nonlinearities.softmax,
-                "tanh": nonlinearities.tanh
+                "sigmoid": lasagne.nonlinearities.sigmoid,
+                "ReLU": lasagne.nonlinearities.rectify,
+                "softmax": lasagne.nonlinearities.softmax,
+                "tanh": lasagne.nonlinearities.tanh
             }[req]
         def get_init(layer):
             default_init = "GlorotUniform" # for both Conv2DLayer and DenseLayer (Conv2DCCLayer is None)
