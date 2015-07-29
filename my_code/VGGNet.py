@@ -48,9 +48,11 @@ class VGGNet(object):
 
         if cuda_convnet:
             import lasagne.layers.cuda_convnet # will crash if theano device is not the GPU
-        pdb.set_trace()
-        self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer if cuda_convnet else lasagne.layers.Conv2DLayer
-        self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer if cuda_convnet else lasagne.layers.MaxPool2DLayer
+            self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer
+            self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer
+        else:
+            self.convOp = lasagne.layers.Conv2DLayer
+            self.maxOp = lasagne.layers.MaxPool2DLayer
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
