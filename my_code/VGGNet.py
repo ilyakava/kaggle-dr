@@ -250,7 +250,7 @@ class VGGNet(object):
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid, valid_out
 
-    def build_model(self, model_spec, leak_alpha, pad, filter_shape, cuda_convnet):
+    def build_model(self, model_spec, leak_alpha, pad, filter_shape):
         print("Building model from JSON...")
         def get_nonlinearity(layer):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
