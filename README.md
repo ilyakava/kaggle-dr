@@ -88,7 +88,7 @@ It is possible to run the network on the cpu, though it seems to take 5 seconds 
 1. prefix your python command with: `THEANO_FLAGS='device=cpu'`
 2. you must use the command line options `-cc 0 -fs bc01` when you run the network.
 
-<sup>*</sup>: Tested on a batch size 2 with 128px images.
+<sup>*</sup>Tested on a batch size 2 with 128px images.
 
 #### Easiest to train
 
