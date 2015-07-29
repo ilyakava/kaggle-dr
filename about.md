@@ -3,7 +3,7 @@
 The [Diabetic Retinopathy challenge on Kaggle][KL] has just finished. The goal of the
 competition was to predict the presence and severity of the disease [Diabetic Retinopathy](https://en.wikipedia.org/wiki/Diabetic_retinopathy) from photographs of eyes. I finished in [20th place][KL] using a Convolutional Neural Network (ConvNet). In this post I'll explain my learning process and progress as I implemented my first ConvNet over the last 3 months. Throughout, I'll link to the implementations in my code, which is [available on github](https://github.com/ilyakava/kaggle-dr) for anyone who wishes to replicate my score.
 
-![**My progress over all my 170+ experiments**. See the Misc section at the end for a list of the improvements that each point represents here as written along the x-axis. *Each point represents an experiment that set a personal record high (on a validation set) of the Kappa score that the competition is judged by. Each point contains a description of the change that caused the improvement (each improvement is accumulated over the experiments, i.e. later runs include all the past improvements).*](http://f.cl.ly/items/0i1M3h310Y0n411L0D40/summary2.png)
+![**My progress over all my 170+ experiments**. See the Misc section at the end for a list of the improvements that each point represents here as written along the x-axis. *Each point represents an experiment that set a personal record high (on a validation set) of the Kappa score that the competition is judged by. Each point contains a description of the change that caused the improvement (each improvement is accumulated over the experiments, i.e. later runs include all the past improvements).*](http://i.imgur.com/vFO8xTT.png)
 
 # Introduction
 
@@ -17,13 +17,15 @@ Diabetic Retinopathy (DR) is one of the most significant complications of diabet
 3. Severe NPDR: IRMA (shunt vessels), venous bleeding in 2+ quadrants, 20+ intra-retinal hemorrhages, no signs PDR
 4. Neovascularization (often vessels with loops or very squiggly vessels), vitreous/preretinal hemorrhage, PDR
 
-![**Examples of pathological classes 1,2,3,4 from left to right**](http://f.cl.ly/items/3s0239201r2A000l3Y3W/pathological.png)
+![**Examples of pathological classes 1,2,3,4 from left to right**](http://i.imgur.com/oLb6APA.png)
 
 The goal of the competition is to build a classifier that takes in these images, and outputs an integer diagnosis 0-4.
 
 ## My Approach: Convnets
 
-![**A ConvNet correctly predicts class 2** *This plot shows the original 128x128 training image (41188_right) with four heatmaps. Each heatmap corresponds to one of four pathological classes. Each pixel in the heatmap represents the probability that that class is true given that pixel is corrupted in the original image. [The heatmaps were created](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/plot_occluded_activations.py#L19) by moving around a 11x11 pixel block which hid a region of the image at testing time. The low probability areas (blue) mean that without those pixels that class would not be predicted. Here the network has learned to find the subtle hard exudate and (less so) cotton wool spots indicate classes 1 and 2 (since those classes would not be likely if those areas were obfuscated).*](http://f.cl.ly/items/0s3D1G2J402n2y1s0F0P/modelX_41188_right.png)
+![**A ConvNet correctly predicts class 2** *This plot shows the original 128x128 training image (41188_right) with four heatmaps. Each heatmap corresponds to one of four pathological classes. Each pixel in the heatmap represents the probability that that class is true given that pixel is corrupted in the original image. [The heatmaps were created](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/plot_occluded_activations.py#L19) by moving around a 11x11 pixel block which hid a region of the image at testing time. The low probability areas (blue) mean that without those pixels that class would not be predicted. Here the network has learned to find the subtle hard exudate and (less so) cotton wool spots indicate classes 1 and 2 (since those classes would not be likely if those areas were obfuscated).*](http://i.imgur.com/a84jOLB.png)
+
+![**A ConvNet predicts 0 for a true class 2** *This time we see, in the probability heatmap for class 1, the cluster of hard exudates at the bottom middle and  single exudate top right are picked up as important features. It is also interesting to see that when the bottom letterbox and the middle lens blur defects are covered up the probability of the pathological class rises. However, the probability of each of the pathological cases was just below the threshold for prediction (0.5) when no part of the image was covered up, so we have a false negative here.*](http://i.imgur.com/quupxTB.png)
 
 Since my last [Machine Learning class](http://www.cs.columbia.edu/~jebara/4772/), I've been looking forward to using ConvNets because of the promise of end-to-end learning: learning a feature extractor and a classifier simultaneously. This property allows accurate classifiers to be created without much domain knowledge. So in May, I read through a [Stanford tutorial][karpathy] and [Columbia reading list](http://llcao.net/cu-deeplearning15/reading.html) and toured [theano](http://deeplearning.net/software/theano/) while [implementing the best performing ConvNet on MNIST](http://github.com/ilyakava/ciresan). After that, I moved onto the more challenging DR dataset, with guidance from Sander Dieleman's posts on his two Kaggle ConvNet wins: classifying [galaxies][galaxy] and [plankton][plankton].
 
@@ -33,13 +35,13 @@ I used same software setup as [Sander Dieleman in his Galaxy post][galaxy]. For 
 
 Of the networks I include, [128x128 runs](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L183) (kappa ~0.68) took me 3.5 mins/epoch, [192x192 runs](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L282) (kappa ~0.72) took 7.8 mins/epoch, and [256x256 runs](https://github.com/ilyakava/kaggle-dr/blob/master/network_specs.json#L282) (kappa ~0.74) took 14 mins/epoch.
 
-![Adding resolution provided huge gains, as seen in these validation errors for runs 120 through 162 (run descriptions in Misc section at end). A whole new cliff of lower errors is discovered simply by using larger images!](http://i.imgur.com/TA0prdQ.png)
+![**Adding resolution provided huge gains** *As seen in these validation errors for runs 120 through 162 (run descriptions in Misc section at end). A whole new cliff of lower errors is discovered simply by using larger images!*](http://i.imgur.com/TA0prdQ.png)
 
 # Preprocessing
 
 ## [Resizing with Graphicsmagick](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/create_resize_batchfiles.py#L29)
 
-The supplied data consisted of JPEGs which were often 16 megapixels. For every size that I experimented with (128,152,192,236,256,292) my downsampling was the same strategy: crop out the surrounding black, size down the width, then vertically crop/letterbox until the image is square. I used PNGs because they are my favorite lossless format.
+The supplied data consisted of JPEGs which were often 16 megapixels. For every size that I experimented with (128,152,192,236,256,292) my downsampling was the same strategy: crop out the surrounding black, size down the width, then vertically crop/letterbox until the image is square. I used PNGs because they are my favorite lossless format. I did not play around with different ways to downsample with graphicsmagick, though I am curious if it would have made a difference.
 
 I played around with the idea of removing black pixels by using a [log-polar transformation](https://ganymed.imib.rwth-aachen.de/irma/ps-pdf/paper_fundus.pdf) on the images, but was unhappy with the distortion effect since the images are not all aligned in the same way (macula is not always centered).
 
@@ -53,7 +55,7 @@ For input into the network, histogram normalization with [graphicsmagick](http:/
 
 ## Exploiting Invariances by adding Noise
 
-![Adding random flipping and color casting noise was essential to delay overfitting and continue decaying the error, as seen in the validation error of runs 40 through 120 plotted here (run descriptions in Misc section at end). Notice how the earlier runs are bowl shaped while later runs are a cliff: adding color deepens the bowl, a custom error function widens it, but adding noise to the dataset turns it into a cliff.](http://i.imgur.com/uuXa96B.png)
+![**Adding random flipping and color casting noise was essential to delay overfitting and continue decaying the error** *(as seen in the validation error of runs 40 through 120 plotted here (run descriptions in Misc section at end)). Notice how the earlier runs are bowl shaped while later runs are a cliff: adding color deepens the bowl, a custom error function widens it, but adding noise to the dataset turns it into a cliff.*](http://i.imgur.com/uuXa96B.png)
 
 ### [Flipping](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L15)
 
@@ -69,7 +71,7 @@ I first heard about this from a [paper out of Baidu](http://arxiv.org/abs/1501.0
 
 Early on, I had the belief that any reduction in noise in the training set would improve my convergence. For this reason, I decided to align all the training set images. Some images display a tab jutting out of the eyeball in the right half of the image. When this is the case, this means the image is [inverted](http://www.olympusmicro.com/primer/images/magnification/convexlens3.jpg). I wrote a pattern recognition style [tab detector](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/align_util.py#L114) that with 90% accuracy would detect this tab, and with the additional information of right/left eye from the image name, would output the flip that would put the optic nerve in the right of the image.
 
-![A sample of 115 images after alignment, most of the time the optic nerve is on the right.](http://i.imgur.com/4nzDAHx.gif)
+![**A sample of 115 images after alignment**, *most of the time the optic nerve is on the right*.](http://i.imgur.com/4nzDAHx.gif)
 
 This pre-alignment gave a 1% improvement over the same run with the images oriented as they are found in the training set. However random flipping provided a 10% benefit, so this work did not prove useful.
 
@@ -122,9 +124,9 @@ I would have also liked to try sharing parameters between pairs of images (left 
 
 ## [Error Function](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L150) and Number of Output Nodes
 
-I started by using the same error function I did for MNIST: [categorical cross entropy](http://lasagne.readthedocs.org/en/latest/modules/objectives.html?highlight=entropy#lasagne.objectives.categorical_crossentropy). This has the downside of not encoding any information that the classes are ordinal (4>3>2>1>0 in the severity of DR) and not differentiating between errors of different magnitudes (unlike the metric that the competition is judged on).
+I started by using the same error function I did for MNIST: [categorical cross entropy](http://lasagne.readthedocs.org/en/latest/modules/objectives.html?highlight=entropy#lasagne.objectives.categorical_crossentropy) after a softmax (all class probabilities sum to 1) non-linearity. This has the downside of not encoding any information that the classes are ordinal (4>3>2>1>0 in the severity of DR) and not differentiating between errors of different magnitudes (unlike the metric that the competition is judged on).
 
-For this reason I followed the advice on the [Kaggle forums](https://www.kaggle.com/c/diabetic-retinopathy-detection/forums/t/13115/paper-on-using-ann-for-ordinal-problems) and used an nn-rank target matrix with relative entropy as described in [this paper](https://web.missouri.edu/~zwyw6/files/rank.pdf). This resulted in the [following target matrix](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L171) for a four node output network:
+For this reason I followed the advice on the [Kaggle forums](https://www.kaggle.com/c/diabetic-retinopathy-detection/forums/t/13115/paper-on-using-ann-for-ordinal-problems) and used an nn-rank target matrix with relative entropy as described in [this paper](https://web.missouri.edu/~zwyw6/files/rank.pdf) after a sigmoid layer (each class probability is between [0,1]). This resulted in the [following target matrix](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L171) for a four node output network:
 
 ```
 [
@@ -168,6 +170,10 @@ When I tried matrices that were [more steep](https://github.com/ilyakava/kaggle-
 
 If I had more time, my next step would have been to experiment directly with exaggerating the underestimate penalty and under-emphasizing the overestimate penalty to exert more control over the false-negative <-> false-positive tradeoff.
 
+## Prediction
+
+The actual prediction was pretty trivial. Since each output node after the sigmoid non-linearity take a value between 0 and 1, I count the number of nodes greater than. There were very few discontinuities here (98% of examples always had a lower probability for a more pathological case). But I also feel like maybe I could have done something more elaborate here to boost performance.
+
 # Training/Optimization
 
 ## Batch Selection
@@ -179,6 +185,8 @@ Each minibatch had the [same proportions of labels](https://github.com/ilyakava/
 [I laid away 15%](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/data_stream.py#L146) of the training set for validation, and held this set constant for my last 100 runs. Luckily, my validation set score was always ±0.5% of my Kaggle Public leaderboard submissions.
 
 ## SGD
+
+Training was done with SGD and Nesterov momentum (always 0.9). The majority of runs were with minibatches of size 128, so there were ~240 gradient steps per epoch.
 
 ## [Init](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/VGGNet.py#L262)
 
@@ -194,11 +202,11 @@ Very few experiments were run with [L1](https://github.com/ilyakava/kaggle-dr/bl
 
 ### Dropout
 
-![Dropout was essential for the network to even train for long. This plot shows the validation error on runs 14 through 40 in the summary (run descriptions in Misc section at end). Before GlorotUniform, the error was a totally flat line at 1. Adding dropout and pooling prevented the overfitting seen in GlorotUniform, and overlapping pooling led to a quicker error drop.](http://i.imgur.com/z3mBqVM.png)
+![**Dropout was essential for the network to even train for long.** *This plot shows the validation error on runs 14 through 40 in the summary (run descriptions in Misc section at end). Before GlorotUniform, the error was a totally flat line at 1. Adding dropout and pooling prevented the overfitting seen in GlorotUniform, and overlapping pooling led to a quicker error drop.*](http://i.imgur.com/z3mBqVM.png)
 
 ## [Ensemble](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/avg_raw_outputs.py#L18)
 
-I got about 1 to 2% improvements when I averaged the raw outputs of several networks (last 4 nodes after the nonlinearity for each example) and then made my prediction.
+I got about 1 to 2% improvements when I averaged the raw outputs of several networks (last 4 nodes after the nonlinearity for each example) and then made my prediction. I wonder if there would have been a difference if I averaged before the non-linearity.
 
 # Misc
 
@@ -228,11 +236,11 @@ I got about 1 to 2% improvements when I averaged the raw outputs of several netw
 - run 162: 256px
 
 
-![Runs 14 through 40](http://i.imgur.com/aCPLFmJ.png)
+![**Runs 14 through 40**](http://i.imgur.com/aCPLFmJ.png)
 
-![Runs 40 through 120](http://i.imgur.com/nIuwrI3.png)
+![**Runs 40 through 120**](http://i.imgur.com/nIuwrI3.png)
 
-![Runs 120 through 162](http://i.imgur.com/Mqqsgi1.png)
+![**Runs 120 through 162**](http://i.imgur.com/Mqqsgi1.png)
 
 ## [Dealing with Class Imbalance](https://github.com/ilyakava/kaggle-dr/blob/master/my_code/sampler.py#L26)
 
