@@ -18,7 +18,6 @@ from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 import lasagne
 from lasagne import layers, nonlinearities
-import lasagne.layers.cuda_convnet
 from lasagne.nonlinearities import LeakyRectify
 # this repo
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
@@ -32,7 +31,7 @@ import pdb
 class VGGNet(object):
     def __init__(self, data_stream, batch_size, init_learning_rate, momentum,
                  leak_alpha, model_spec, loss_type, num_output_classes, pad,
-                 image_shape, filter_shape, runid=None):
+                 image_shape, filter_shape, cuda_convnet=1, runid=None):
         self.column_init_args = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape]
         # data setup
         self.ds = data_stream
@@ -46,6 +45,11 @@ class VGGNet(object):
         self.learning_rate_decayed_epochs = []
         self.flip_noise = 1
         self.runid = runid
+
+        if cuda_convnet:
+            import lasagne.layers.cuda_convnet # will crash if theano device is not the GPU
+        self.convOp = layers.cuda_convnet.Conv2DCCLayer if cuda_convnet else layers.Conv2DDNNLayer
+        self.maxOp = layers.cuda_convnet.MaxPool2DCCLayer if cuda_convnet else layers.MaxPool2DDNNLayer
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
@@ -116,10 +120,10 @@ class VGGNet(object):
                 weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1]) # after 2nd dimshuffle, i.e. bc01 no matter what
             elif type(l) is layers.pool.FeaturePoolLayer:
                 memory += l.output_shape[-1]
-            elif type(l) is layers.cuda_convnet.Conv2DCCLayer:
+            elif type(l) is self.convOp:
                 memory += numpy.prod(l.output_shape[_c01])
                 weights.append(numpy.prod(l.get_W_shape()[_01])*p.output_shape[_c]*l.output_shape[_c])
-            elif type(l) is layers.cuda_convnet.MaxPool2DCCLayer:
+            elif type(l) is self.maxOp:
                 memory += numpy.prod(l.output_shape[_c01])
                 widths.append(l.output_shape[2])
         return(widths,weights,memory)
@@ -246,7 +250,7 @@ class VGGNet(object):
             raise ValueError("unsupported loss_type %s for output shape %i" % (loss_type, self.num_output_classes))
         return loss_train, loss_valid, pred_valid, valid_out
 
-    def build_model(self, model_spec, leak_alpha, pad, filter_shape):
+    def build_model(self, model_spec, leak_alpha, pad, filter_shape, cuda_convnet):
         print("Building model from JSON...")
         def get_nonlinearity(layer):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
@@ -284,7 +288,7 @@ class VGGNet(object):
                 border_mode = 'full' if pad else 'valid'
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
-                all_layers.append(layers.cuda_convnet.Conv2DCCLayer(all_layers[-1],
+                all_layers.append(self.convOp(all_layers[-1],
                                     num_filters=cs["num_filters"],
                                     filter_size=(cs["filter_size"], cs["filter_size"]),
                                     border_mode=border_mode,
@@ -292,7 +296,7 @@ class VGGNet(object):
                                     nonlinearity=get_nonlinearity(cs),
                                     dimshuffle=dimshuffle))
                 if cs.get("pool_size"):
-                    all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1],
+                    all_layers.append(self.maxOp(all_layers[-1],
                                         pool_size=(cs["pool_size"], cs["pool_size"]),
                                         stride=(cs["pool_stride"], cs["pool_stride"]),
                                         dimshuffle=dimshuffle))
@@ -487,7 +491,8 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  noise_decay_start, noise_decay_duration, noise_decay_severity,
                  valid_flip, test_flip, sample_class, custom_distribution,
                  train_color_cast, valid_color_cast, test_color_cast,
-                 color_cast_range, override_input_size, model_file, filter_shape, cache_size_factor):
+                 color_cast_range, override_input_size, model_file, filter_shape,
+                 cache_size_factor, cuda_convnet):
     runid = "%s-%s-%s" % (str(uuid.uuid4())[:8], network, loss_type)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
@@ -501,10 +506,10 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
         batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
         f.close()
 
-        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, runid=runid)
+        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet=cuda_convnet, runid=runid)
         column.restore(model_file)
     else:
-        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, runid=runid)
+        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet=cuda_convnet, runid=runid)
 
     try:
         column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
@@ -555,4 +560,5 @@ if __name__ == '__main__':
                 override_input_size=_.override_input_size,
                 model_file=_.model_file,
                 filter_shape=_.filter_shape,
-                cache_size_factor=_.cache_size_factor)
+                cache_size_factor=_.cache_size_factor,
+                cuda_convnet=_.cuda_convnet)

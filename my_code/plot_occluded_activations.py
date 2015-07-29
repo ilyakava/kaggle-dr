@@ -146,4 +146,5 @@ if __name__ == '__main__':
            test_dataset=None,
            random_seed=_.random_seed,
            valid_dataset_size=_.valid_dataset_size,
-           filter_shape=_.filter_shape)
+           filter_shape=_.filter_shape,
+           cuda_convnet=_.cuda_convnet)

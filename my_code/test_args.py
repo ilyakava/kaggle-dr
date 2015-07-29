@@ -52,5 +52,11 @@ def get():
                         default='c01b',
                         choices=['c01b', 'bc01'],
                         help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape).")
+    parser.add_argument("-C",
+                        "--cuda-convnet",
+                        type=int,
+                        default=1,
+                        choices=[0,1],
+                        help="Use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
 
     return parser.parse_args()
