@@ -279,9 +279,9 @@ class VGGNet(object):
                 "Unfold4xBatchesLayer": Unfold4xBatchesLayer
             }[layer]
 
-        all_layers = [layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
+        all_layers = [lasagne.layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
         if filter_shape == 'c01b':
-            all_layers.append(layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
+            all_layers.append(lasagne.layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
         dimshuffle = False if filter_shape == 'c01b' else True
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
@@ -303,19 +303,19 @@ class VGGNet(object):
                                         dimshuffle=dimshuffle))
             elif cs["type"] == "FC":
                 if (model_spec[i-1]["type"] == "CONV") and (filter_shape == 'c01b'):
-                    all_layers.append(layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
+                    all_layers.append(lasagne.layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
-                all_layers.append(layers.DenseLayer(all_layers[-1],
+                all_layers.append(lasagne.layers.DenseLayer(all_layers[-1],
                                    num_units=cs["num_units"],
                                    W=get_init(cs),
                                    nonlinearity=get_nonlinearity(cs)))
                 if cs.get("pool_size"):
-                    all_layers.append(layers.FeaturePoolLayer(all_layers[-1], cs["pool_size"]))
+                    all_layers.append(lasagne.layers.FeaturePoolLayer(all_layers[-1], cs["pool_size"]))
             elif cs["type"] == "OUTPUT":
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
-                all_layers.append(layers.DenseLayer(all_layers[-1],
+                all_layers.append(lasagne.layers.DenseLayer(all_layers[-1],
                                    num_units=self.num_output_classes,
                                    W=get_init(cs),
                                    nonlinearity=get_nonlinearity(cs)))
