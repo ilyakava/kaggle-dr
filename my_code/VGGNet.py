@@ -17,9 +17,8 @@ import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 import lasagne
-from lasagne import layers, nonlinearities
-import lasagne.layers.cuda_convnet
-from lasagne.nonlinearities import LeakyRectify
+# from lasagne import layers, lasagne.nonlinearities
+# from lasagne.nonlinearities import LeakyRectify
 # this repo
 from my_code.predict_util import QWK, print_confusion_matrix, UnsupportedPredictedClasses
 from my_code.data_stream import DataStream
@@ -32,7 +31,8 @@ import pdb
 class VGGNet(object):
     def __init__(self, data_stream, batch_size, init_learning_rate, momentum,
                  leak_alpha, model_spec, loss_type, num_output_classes, pad,
-                 image_shape, filter_shape, runid=None):
+                 image_shape, filter_shape, cuda_convnet=1, runid=None):
+        global lasagne
         self.column_init_args = [batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape]
         # data setup
         self.ds = data_stream
@@ -46,6 +46,12 @@ class VGGNet(object):
         self.learning_rate_decayed_epochs = []
         self.flip_noise = 1
         self.runid = runid
+
+        self.cuda_convnet = cuda_convnet
+        if self.cuda_convnet:
+            import lasagne.layers.cuda_convnet # will crash if theano device is not the GPU
+        self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer if self.cuda_convnet else lasagne.layers.Conv2DLayer
+        self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer if self.cuda_convnet else lasagne.layers.MaxPool2DLayer
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
@@ -110,16 +116,16 @@ class VGGNet(object):
         for i in range(1,len(self.all_layers)):
             l = self.all_layers[i]
             p = self.all_layers[i-1]
-            if type(l) is layers.dense.DenseLayer:
+            if type(l) is lasagne.layers.dense.DenseLayer:
                 memory += l.output_shape[-1]
                 widths.append(l.output_shape[-1])
                 weights.append(numpy.prod(p.output_shape[1:])*l.output_shape[-1]) # after 2nd dimshuffle, i.e. bc01 no matter what
-            elif type(l) is layers.pool.FeaturePoolLayer:
+            elif type(l) is lasagne.layers.pool.FeaturePoolLayer:
                 memory += l.output_shape[-1]
-            elif type(l) is layers.cuda_convnet.Conv2DCCLayer:
+            elif type(l) is self.convOp:
                 memory += numpy.prod(l.output_shape[_c01])
                 weights.append(numpy.prod(l.get_W_shape()[_01])*p.output_shape[_c]*l.output_shape[_c])
-            elif type(l) is layers.cuda_convnet.MaxPool2DCCLayer:
+            elif type(l) is self.maxOp:
                 memory += numpy.prod(l.output_shape[_c01])
                 widths.append(l.output_shape[2])
         return(widths,weights,memory)
@@ -252,12 +258,12 @@ class VGGNet(object):
             default_nonlinear = "ReLU"  # for all Conv2DLayer, Conv2DCCLayer, and DenseLayer
             req = layer.get("nonlinearity") or default_nonlinear
             return {
-                "LReLU": LeakyRectify(1./leak_alpha),
+                "LReLU": lasagne.nonlinearities.LeakyRectify(1./leak_alpha),
                 "None": None,
-                "sigmoid": nonlinearities.sigmoid,
-                "ReLU": nonlinearities.rectify,
-                "softmax": nonlinearities.softmax,
-                "tanh": nonlinearities.tanh
+                "sigmoid": lasagne.nonlinearities.sigmoid,
+                "ReLU": lasagne.nonlinearities.rectify,
+                "softmax": lasagne.nonlinearities.softmax,
+                "tanh": lasagne.nonlinearities.tanh
             }[req]
         def get_init(layer):
             default_init = "GlorotUniform" # for both Conv2DLayer and DenseLayer (Conv2DCCLayer is None)
@@ -274,43 +280,44 @@ class VGGNet(object):
                 "Unfold4xBatchesLayer": Unfold4xBatchesLayer
             }[layer]
 
-        all_layers = [layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
+        all_layers = [lasagne.layers.InputLayer(shape=(self.batch_size, model_spec[0]["channels"], model_spec[0]["size"], model_spec[0]["size"]))]
         if filter_shape == 'c01b':
-            all_layers.append(layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
+            all_layers.append(lasagne.layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
         dimshuffle = False if filter_shape == 'c01b' else True
+        kwargs = {'dimshuffle': dimshuffle} if self.cuda_convnet else {}
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             if cs["type"] == "CONV":
                 border_mode = 'full' if pad else 'valid'
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
-                all_layers.append(layers.cuda_convnet.Conv2DCCLayer(all_layers[-1],
+                all_layers.append(self.convOp(all_layers[-1],
                                     num_filters=cs["num_filters"],
                                     filter_size=(cs["filter_size"], cs["filter_size"]),
                                     border_mode=border_mode,
                                     W=get_init(cs),
                                     nonlinearity=get_nonlinearity(cs),
-                                    dimshuffle=dimshuffle))
+                                    **kwargs))
                 if cs.get("pool_size"):
-                    all_layers.append(layers.cuda_convnet.MaxPool2DCCLayer(all_layers[-1],
+                    all_layers.append(self.maxOp(all_layers[-1],
                                         pool_size=(cs["pool_size"], cs["pool_size"]),
                                         stride=(cs["pool_stride"], cs["pool_stride"]),
-                                        dimshuffle=dimshuffle))
+                                        **kwargs))
             elif cs["type"] == "FC":
                 if (model_spec[i-1]["type"] == "CONV") and (filter_shape == 'c01b'):
-                    all_layers.append(layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
+                    all_layers.append(lasagne.layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
-                all_layers.append(layers.DenseLayer(all_layers[-1],
+                all_layers.append(lasagne.layers.DenseLayer(all_layers[-1],
                                    num_units=cs["num_units"],
                                    W=get_init(cs),
                                    nonlinearity=get_nonlinearity(cs)))
                 if cs.get("pool_size"):
-                    all_layers.append(layers.FeaturePoolLayer(all_layers[-1], cs["pool_size"]))
+                    all_layers.append(lasagne.layers.FeaturePoolLayer(all_layers[-1], cs["pool_size"]))
             elif cs["type"] == "OUTPUT":
                 if cs.get("dropout"):
                     all_layers.append(lasagne.layers.DropoutLayer(all_layers[-1], p=cs["dropout"]))
-                all_layers.append(layers.DenseLayer(all_layers[-1],
+                all_layers.append(lasagne.layers.DenseLayer(all_layers[-1],
                                    num_units=self.num_output_classes,
                                    W=get_init(cs),
                                    nonlinearity=get_nonlinearity(cs)))
@@ -422,7 +429,7 @@ class VGGNet(object):
     def train(self, max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch):
         print("Training...")
         start_time = time.clock()
-        batch_multiple_to_validate = self.n_train_batches // validations_per_epoch
+        batch_multiple_to_validate = max(1, int(self.n_train_batches / float(validations_per_epoch)))
         # reset training state of column
         self.epoch = 0
         self.iter = 0
@@ -487,7 +494,8 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  noise_decay_start, noise_decay_duration, noise_decay_severity,
                  valid_flip, test_flip, sample_class, custom_distribution,
                  train_color_cast, valid_color_cast, test_color_cast,
-                 color_cast_range, override_input_size, model_file, filter_shape, cache_size_factor):
+                 color_cast_range, override_input_size, model_file, filter_shape,
+                 cache_size_factor, cuda_convnet):
     runid = "%s-%s-%s" % (str(uuid.uuid4())[:8], network, loss_type)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
@@ -501,10 +509,10 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
         batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
         f.close()
 
-        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, runid=runid)
+        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet=cuda_convnet, runid=runid)
         column.restore(model_file)
     else:
-        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, runid=runid)
+        column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet=cuda_convnet, runid=runid)
 
     try:
         column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
@@ -555,4 +563,5 @@ if __name__ == '__main__':
                 override_input_size=_.override_input_size,
                 model_file=_.model_file,
                 filter_shape=_.filter_shape,
-                cache_size_factor=_.cache_size_factor)
+                cache_size_factor=_.cache_size_factor,
+                cuda_convnet=_.cuda_convnet)

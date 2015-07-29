@@ -81,6 +81,15 @@ Depending on how your CPU schedules, more than 1 batchfile may not result in any
 
 ### Training the network
 
+#### Running on CPU
+
+It is possible to run the network on a cpu, though keep in mind it is 15 times slower to train a single batch of size 128!<sup>*</sup> There are two things to keep in mind:
+
+1. prefix your python command with: `THEANO_FLAGS='device=cpu'`
+2. you must use the command line options `-cc 0 -fs bc01` when you run the network.
+
+<sup>*</sup>On an Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz with the default network on 128px images, it takes 54.8 mins per epoch on the CPU versus 3.7 mins/epoch on the GPU.
+
 #### Easiest to train
 
 `python -m my_code.VGGNet -x 160`
@@ -112,6 +121,10 @@ Depending on how your CPU schedules, more than 1 batchfile may not result in any
 ### Comparing csvs for overlap
 
 `python -m my_code.compare_csv data/train/trainLabels.csv results/result1.csv`
+
+### Occlusion heatmap study
+
+`python -m my_code.plot_occluded_activations -M models/mymodel.pkl -D data/train/centered_crop/41188_right.png`
 
 # Misc
 
