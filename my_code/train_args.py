@@ -180,7 +180,7 @@ def get():
                         type=int,
                         default=8,
                         help="The number of multiples of minimatches to store in GPU device memory at once.")
-    parser.add_argument("-C",
+    parser.add_argument("-cc",
                         "--cuda-convnet",
                         type=int,
                         default=1,

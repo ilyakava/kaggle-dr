@@ -52,7 +52,7 @@ def get():
                         default='c01b',
                         choices=['c01b', 'bc01'],
                         help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape).")
-    parser.add_argument("-C",
+    parser.add_argument("-cc",
                         "--cuda-convnet",
                         type=int,
                         default=1,
