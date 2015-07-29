@@ -185,6 +185,6 @@ def get():
                         type=int,
                         default=1,
                         choices=[0,1],
-                        help="If you do not have a GPU, you must pass '-cc 0'. If 1: use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
+                        help="If you do not have a GPU, you must pass '-cc 0' (and don't forget to set THEANO_FLAGS='device=cpu'). If 1: use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
 
     return parser.parse_args()
