@@ -429,7 +429,7 @@ class VGGNet(object):
     def train(self, max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch):
         print("Training...")
         start_time = time.clock()
-        batch_multiple_to_validate = int(self.n_train_batches / float(validations_per_epoch))
+        batch_multiple_to_validate = max(1, int(self.n_train_batches / float(validations_per_epoch)))
         # reset training state of column
         self.epoch = 0
         self.iter = 0
