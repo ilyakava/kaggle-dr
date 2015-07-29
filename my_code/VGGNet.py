@@ -47,10 +47,11 @@ class VGGNet(object):
         self.flip_noise = 1
         self.runid = runid
 
-        if cuda_convnet:
+        self.cuda_convnet = cuda_convnet
+        if self.cuda_convnet:
             import lasagne.layers.cuda_convnet # will crash if theano device is not the GPU
-        self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer if cuda_convnet else lasagne.layers.Conv2DLayer
-        self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer if cuda_convnet else lasagne.layers.MaxPool2DLayer
+        self.convOp = lasagne.layers.cuda_convnet.Conv2DCCLayer if self.cuda_convnet else lasagne.layers.Conv2DLayer
+        self.maxOp = lasagne.layers.cuda_convnet.MaxPool2DCCLayer if self.cuda_convnet else lasagne.layers.MaxPool2DLayer
         # both train and test are buffered
         self.x_buffer, self.y_buffer = self.ds.train_buffer().next() # dummy fill in
         self.x_buffer = theano.shared(lasagne.utils.floatX(self.x_buffer))
@@ -283,6 +284,7 @@ class VGGNet(object):
         if filter_shape == 'c01b':
             all_layers.append(lasagne.layers.cuda_convnet.ShuffleBC01ToC01BLayer(all_layers[-1]))
         dimshuffle = False if filter_shape == 'c01b' else True
+        kwargs = {'dimshuffle': dimshuffle} if self.cuda_convnet else {}
         for i in xrange(1,len(model_spec)):
             cs = model_spec[i] # current spec
             if cs["type"] == "CONV":
@@ -295,12 +297,12 @@ class VGGNet(object):
                                     border_mode=border_mode,
                                     W=get_init(cs),
                                     nonlinearity=get_nonlinearity(cs),
-                                    dimshuffle=dimshuffle))
+                                    **kwargs))
                 if cs.get("pool_size"):
                     all_layers.append(self.maxOp(all_layers[-1],
                                         pool_size=(cs["pool_size"], cs["pool_size"]),
                                         stride=(cs["pool_stride"], cs["pool_stride"]),
-                                        dimshuffle=dimshuffle))
+                                        **kwargs))
             elif cs["type"] == "FC":
                 if (model_spec[i-1]["type"] == "CONV") and (filter_shape == 'c01b'):
                     all_layers.append(lasagne.layers.cuda_convnet.ShuffleC01BToBC01Layer(all_layers[-1]))

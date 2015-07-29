@@ -174,7 +174,7 @@ def get():
                         type=str,
                         default='c01b',
                         choices=['c01b', 'bc01'],
-                        help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape). Do not use this option if you are not using cuda_convnet.")
+                        help="The shape of the filters in the CONV layer. Use 'bc01' to use slower shape (this option exists to run legacy models trained in the suboptimal shape). You must use 'bc01' if you are not using cuda_convnet.")
     parser.add_argument("-H",
                         "--cache-size-factor",
                         type=int,
