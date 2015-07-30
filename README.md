@@ -12,7 +12,7 @@
 
 If `skimage.io` has issues, try: `sudo pip install -U scikit-image`.
 
-### Install Lasange
+### Install Lasagne
 
 ```
 git clone https://github.com/Lasagne/Lasagne.git && cd Lasagne/ && git checkout 4e4f2f4fdefdab6c2634c7ba080dc3e036782378 && pip install -r requirements.txt && sudo python setup.py install && cd ..
