@@ -152,3 +152,4 @@ This will run the ith of n partitions that creates a csv of which inversions to 
 
 In three different `screen` sessions for parallel processing. Each will report having created a csv file. You can join these multiple csvs into one with: `awk 'FNR==1 && NR!=1{next;}{print}' *.csv > my.csv`
 
+A 90% accurate alignment of the training set is made available [here](https://www.dropbox.com/s/it1e3rjh25020mq/kaggle-dr-alignment-training.csv?dl=0). `horizontal_flip == 1` means the image should be flipped on its horizontal axis (upside-down). `vertical_flip == 1` means the image should be flipped on its vertical axis (left-right). Doing both of the flips as specified in the csv file will lead to 90% of the training images having the optic nerve on the right, slightly above the horizontal.
