@@ -50,6 +50,16 @@ def centered_normalized_crop_batchfile(files, size, in_dir, out_dir, index):
     out.close()
     return name
 
+def resize_smaller_dim_batchfile(files, size, in_dir, out_dir, index):
+    name = "data/convert/resize_smaller_dim_batchfile_%i.txt" % index
+    out = open(name, 'w')
+    for f_ in files:
+        f = '.'.join([f_.split('.')[0], 'png'])
+        cmd = 'convert %s%s -scale %ix%i^ -format png -quality 100 %s%s\n' % (in_dir, f_, size, size, out_dir, f)
+        out.write (cmd)
+    out.close()
+    return name
+
 if __name__ == '__main__':
     arg_names = ['command', 'in_dir', 'out_dir', 'mode', 'size', 'num_batch_files']
     arg = dict(zip(arg_names, sys.argv))
@@ -58,9 +68,9 @@ if __name__ == '__main__':
     out_dir = arg.get('out_dir') or 'data/train/simple_crop/'
     mode = int(arg.get('mode') or 1)
     size = int(arg.get('size') or 112)
-    # graphicsmagick seems to only run on 1 core, there is a 30% increase in performance
-    # using 2 over 1 batch files (probably just b/c of less idleness)
-    # TODO: try forking from python and doing processing from this script
+
+    # Note: performance varies wildly between machines:
+    # http://stackoverflow.com/questions/30625635/can-graphicsmagick-batch-process-on-more-than-2-threads
     num_batch_files = int(arg.get('num_batch_files') or 2)
 
     files = numpy.array(listdir(in_dir))
@@ -76,6 +86,8 @@ if __name__ == '__main__':
         files = gm_batchfiles(groups, size, in_dir, out_dir, downsize_no_trim_batchfile)
     elif mode == 4:
         files = gm_batchfiles(groups, size, in_dir, out_dir, centered_normalized_crop_batchfile)
+    elif mode == 5:
+        files = gm_batchfiles(groups, size, in_dir, out_dir, resize_smaller_dim_batchfile)
     else:
         raise ValueError("unsupported mode %i" % mode)
 
