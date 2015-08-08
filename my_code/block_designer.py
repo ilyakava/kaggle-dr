@@ -43,7 +43,7 @@ class BlockDesigner(object):
         # are substancialy less frequent (sever diagnosis -> higher class number)
         self.proportions = numpy.array([(len(self.reservoir[klass]) / float(self.init_size)) for klass in reversed(xrange(self.K))])
 
-    def safe_insert(y,id):
+    def safe_insert(self, y,id):
         if self.reservoir.get(y):
             self.reservoir[y].append(id)
         else:
