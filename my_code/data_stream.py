@@ -251,6 +251,7 @@ class DataStream(object):
         """
         as_grey = True if self.image_shape[2] == 1 else False
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
+        pdb.set_trace()
         img = self.crop_image(img, crop_lambda)
         return (img.reshape(self.image_shape) / 255.) # reshape in case it is as_grey
 
