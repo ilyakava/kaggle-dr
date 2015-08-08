@@ -12,15 +12,17 @@ def assert_valid_prediction(y_pred, K):
         raise UnsupportedPredictedClasses(forbidden_klasses)
 
 def print_confusion_matrix(M):
-    if M.shape == (5,5):
-        print("Confusion Matrix")
-        print("T\P|    0 |    1 |    2 |    3 |    4 |")
-        print("---|------|------|------|------|------|")
-        for i, y in enumerate(xrange(5)):
-            print(" %d | %4d | %4d | %4d | %4d | %4d |" % ((y, ) + tuple(M[i])))
-            print("---|------|------|------|------|------|")
-    else:
-        print("Printout for confusion matrix of shape {} is Not Implemented".format(M.shape))
+    K = M.shape[0]
+    print("Confusion Matrix")
+    left_margins = [" T\P |", "-----|"]
+    header = left_margins[0] + "".join([" %4d |" % klass for klass in range(K)])
+    spacer = left_margins[1] + "".join(["------|" for klass in range(K)])
+    print header
+    print spacer
+    for pred_klass, true_klass in enumerate(xrange(K)):
+        row = (" %3d |" % true_klass) + "".join([" %4d |" % entry for entry in M[pred_klass]])
+        print row
+        print spacer
 
 def confusion_matrix_kappa(M,K):
     dx = numpy.ones((K,1)) * numpy.arange(K) # klass rating increasing left to right
