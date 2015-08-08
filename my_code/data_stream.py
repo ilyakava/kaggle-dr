@@ -73,7 +73,7 @@ class CropOracle(object):
     def bottom_right_crop(self, img):
         h,w,c = img.shape
         max_t = h - self.out_dim
-        max_l = h - self.out_dim
+        max_l = w - self.out_dim
         return(max_t,h, max_l,w)
 
     def center_crop(self, img):
@@ -251,7 +251,6 @@ class DataStream(object):
         """
         as_grey = True if self.image_shape[2] == 1 else False
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
-        pdb.set_trace()
         img = self.crop_image(img, crop_lambda)
         return (img.reshape(self.image_shape) / 255.) # reshape in case it is as_grey
 
