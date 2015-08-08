@@ -5,11 +5,13 @@ import numpy
 
 import pdb
 
+DEFAULT_COUNT_CLASSES = 5
+
 class BlockDesigner(object):
     """
     Serves batches with the same distribution of labels in each batch
     """
-    def __init__(self, source, K=5, seed=None):
+    def __init__(self, source, K=DEFAULT_COUNT_CLASSES, seed=None):
         """
         :type source: string or dict[int->list[str]]
         :param source: name of a csv or the output of a previous BlockDesigner.break_off_block
@@ -34,8 +36,8 @@ class BlockDesigner(object):
         else:
             raise ValueError("unsupported data source: %s" % str(type(source)))
 
-        if self.K < K:
-            self.K = K
+        # add in some classes if they are missing in the data, but don't take any away
+        self.K = max(K, self.K)
 
         self.reference = self.invert_reservoir()
         self.init_size = self.size()

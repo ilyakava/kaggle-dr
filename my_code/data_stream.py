@@ -177,6 +177,7 @@ class DataStream(object):
         # look for label csv 1 dir above training dir
         train_labels_csv_path = "%s/trainLabels.csv" % '/'.join(train_image_dir.split('/')[:-2])
         bd = BlockDesigner(train_labels_csv_path, seed=self.random_seed)
+        self.K = bd.K
 
         valid_examples = bd.break_off_block(self.valid_dataset_size)
         self.train_examples = bd.remainder()

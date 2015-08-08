@@ -76,7 +76,7 @@ class VGGNet(object):
         batch_slice = slice(cache_block_index * self.batch_size, (cache_block_index + 1) * self.batch_size)
 
         self.params = lasagne.layers.get_all_params(self.all_layers[-1])
-        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type)
+        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type, K=self.ds.K)
         updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
 
         print("Compiling...")
@@ -153,7 +153,7 @@ class VGGNet(object):
             klass_targets = nnrank_target
         return(theano.shared(lasagne.utils.floatX((klass_targets))),pred_valid)
 
-    def build_loss_predictions(self, X, y, output, loss_type, K=5):
+    def build_loss_predictions(self, X, y, output, loss_type, K):
         train_out = lasagne.layers.get_output(output, X)
         valid_out = lasagne.layers.get_output(output, X, deterministic=True)
         klass_targets, pred_valid = self.build_target_label_prediction(valid_out, loss_type, K)
