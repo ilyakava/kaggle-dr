@@ -90,9 +90,8 @@ class CropOracle(object):
 
     def get_crop_lambda(self, mode):
         return {
-            "no_crop": None,
-            "uniform_crop": self.uniform_crop,
-            "center_crop": self.center_crop
+            "center_crop": self.center_crop,
+            "uniform_crop": self.uniform_crop
         }[mode]
 
 class ColorCastOracle(object):
@@ -252,7 +251,7 @@ class DataStream(object):
         """
         as_grey = True if self.image_shape[2] == 1 else False
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
-        img = self.crop_image(img, crop_lambda) if crop_lambda
+        img = self.crop_image(img, crop_lambda)
         return (img.reshape(self.image_shape) / 255.) # reshape in case it is as_grey
 
     def preprocess_image(self, image, flip_coords, color_cast):

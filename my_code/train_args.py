@@ -189,15 +189,15 @@ def get():
     parser.add_argument("-k1",
                         "--pre-train-crop",
                         type=str,
-                        default='no_crop',
+                        default='center_crop',
                         help="Name of method that returns integers ranges to crop an image by.")
     parser.add_argument("-k2",
                         "--train-crop",
                         type=str,
-                        default='no_crop')
+                        default='center_crop')
     parser.add_argument("-k3",
                         "--valid-test-crop",
                         type=str,
-                        default='no_crop')
+                        default='center_crop')
 
     return parser.parse_args()
