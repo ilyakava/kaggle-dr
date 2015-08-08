@@ -66,6 +66,35 @@ class ImageFlipOracle(object):
         assert(level >= 0 and level <= 1)
         self.noise = level
 
+class CropOracle(object):
+    def __init__(self, out_dim):
+        self.out_dim = out_dim
+
+    def bottom_right_crop(self, img):
+        h,w,c = img.shape
+        max_t = h - self.out_dim
+        max_l = h - self.out_dim
+        return(max_t,h, max_l,w)
+
+    def center_crop(self, img):
+        max_t,h, max_l,w = self.bottom_right_crop(img)
+        center_t = max_t / 2
+        center_l = max_l / 2
+        return(center_t, center_t + self.out_dim, center_l, center_l + self.out_dim)
+
+    def uniform_crop(self, img):
+        max_t,h, max_l,w = self.bottom_right_crop(img)
+        rand_t = random.randint(0, max_t)
+        rand_l = random.randint(0, max_l)
+        return(rand_t, rand_t + self.out_dim, rand_l, rand_l + self.out_dim)
+
+    def get_crop_lambda(self, mode):
+        return {
+            "no_crop": None,
+            "uniform_crop": self.uniform_crop,
+            "center_crop": self.center_crop
+        }[mode]
+
 class ColorCastOracle(object):
     def __init__(self, n_channels, color_cast_range):
         self.n_channels = n_channels
@@ -116,7 +145,10 @@ class DataStream(object):
                  train_color_cast='no_cast',
                  valid_color_cast='no_cast',
                  test_color_cast='no_cast',
-                 color_cast_range=20):
+                 color_cast_range=20,
+                 pre_train_crop='center_crop',
+                 train_crop='uniform_crop',
+                 valid_test_crop='center_crop'):
         self.train_image_dir = train_image_dir
         self.test_image_dir = test_image_dir
         self.image_shape = image_shape
@@ -140,6 +172,10 @@ class DataStream(object):
         self.train_color_cast_lambda = color_cast_oracle.get_color_cast_lambda(train_color_cast)
         self.valid_color_cast_lambda = color_cast_oracle.get_color_cast_lambda(valid_color_cast)
         self.test_color_cast_lambda = color_cast_oracle.get_color_cast_lambda(test_color_cast)
+        crop_oracle = CropOracle(self.image_shape[0])
+        self.pre_train_crop_lambda = crop_oracle.get_crop_lambda(pre_train_crop)
+        self.train_crop_lambda = crop_oracle.get_crop_lambda(train_crop)
+        self.valid_test_crop_lambda = crop_oracle.get_crop_lambda(valid_test_crop)
 
         bd = BlockDesigner(TRAIN_LABELS_CSV_PATH, seed=self.random_seed)
 
@@ -162,7 +198,8 @@ class DataStream(object):
     def valid_set(self):
         all_val_images = numpy.zeros(((len(self.valid_dataset["y"]),) + self.image_shape), dtype=theano.config.floatX)
         for i, image in enumerate(self.valid_dataset["X"]):
-            all_val_images[i, ...] = self.feed_image(image, self.train_image_dir, self.valid_flip_lambda, self.valid_color_cast_lambda) # b01c, Theano: bc01 CudaConvnet: c01b
+            all_val_images[i, ...] = self.feed_image(image, self.train_image_dir, self.valid_flip_lambda,
+                                                     self.valid_color_cast_lambda, self.valid_test_crop_lambda) # b01c, Theano: bc01 CudaConvnet: c01b
         return numpy.rollaxis(all_val_images, 3, 1), numpy.array(self.valid_dataset["y"], dtype='int32')
 
     def train_buffer(self, new_flip_noise=None):
@@ -180,7 +217,8 @@ class DataStream(object):
             ith_cache_block_end = (ith_cache_block + 1) * self.cache_size
             ith_cache_block_slice = slice(ith_cache_block * self.cache_size, ith_cache_block_end)
             for i, image in enumerate(train_dataset["X"][ith_cache_block_slice]):
-                x_cache_block[i, ...] = self.feed_image(image, self.train_image_dir, self.train_flip_lambda, self.train_color_cast_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.train_image_dir, self.train_flip_lambda,
+                                                        self.train_color_cast_lambda, self.train_crop_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(train_dataset["y"][ith_cache_block_slice], dtype='int32')
 
     def test_buffer(self):
@@ -196,22 +234,25 @@ class DataStream(object):
             ith_cache_block_slice = slice(ith_cache_block * self.cache_size, ith_cache_block_end)
             idxs_to_full_dataset = list(range(ith_cache_block * self.cache_size, ith_cache_block_end))
             for i, image in enumerate(self.test_dataset["X"][ith_cache_block_slice]):
-                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda, self.test_color_cast_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda,
+                                                        self.test_color_cast_lambda, self.valid_test_crop_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
         # sneak the leftovers out, padded by the previous full cache block
         if n_leftovers:
             leftover_slice = slice(ith_cache_block_end, ith_cache_block_end + n_leftovers)
             for i, image in enumerate(self.test_dataset["X"][leftover_slice]):
                 idxs_to_full_dataset[i] = ith_cache_block_end + i
-                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda, self.test_color_cast_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda,
+                                                        self.test_color_cast_lambda, self.valid_test_crop_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
 
-    def read_image(self, image_name, image_dir, extension=".png"):
+    def read_image(self, image_name, image_dir, crop_lambda, extension=".png"):
         """
         :type image: string
         """
         as_grey = True if self.image_shape[2] == 1 else False
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
+        img = self.crop_image(img, crop_lambda) if crop_lambda
         return (img.reshape(self.image_shape) / 255.) # reshape in case it is as_grey
 
     def preprocess_image(self, image, flip_coords, color_cast):
@@ -226,6 +267,12 @@ class DataStream(object):
         if not self.std == None:
             image = image / (self.std + 1e-5)
         return self.amplify * image
+
+    def crop_image(self, img, crop_lambda):
+        t,b,l,r = crop_lambda(img)
+        assert(b-t == self.image_shape[0])
+        assert(r-l == self.image_shape[1])
+        return img[t:b, l:r, :]
 
     def color_cast_image(self, image, color_cast, masked=False):
         if masked:
@@ -246,8 +293,8 @@ class DataStream(object):
             image = numpy.fliplr(image)
         return image
 
-    def feed_image(self, image_name, image_dir, flip_lambda=None, color_cast_lambda=None):
-        img = self.read_image(image_name, image_dir)
+    def feed_image(self, image_name, image_dir, crop_lambda=None, flip_lambda=None, color_cast_lambda=None):
+        img = self.read_image(image_name, image_dir, crop_lambda)
         flip_coords = flip_lambda(image_name) if flip_lambda else numpy.zeros(2)
         color_cast = color_cast_lambda() if color_cast_lambda else numpy.zeros(self.image_shape[-1])
         return self.preprocess_image(img, flip_coords, color_cast)
@@ -263,7 +310,7 @@ class DataStream(object):
         N = sum([len(ids) for y, ids in self.train_examples.items()]) # self.train_dataset_size + remainders
         for y, ids in self.train_examples.items():
             for image in ids:
-                img = self.read_image(image, self.train_image_dir)
+                img = self.read_image(image, self.train_image_dir, self.pre_train_crop_lambda)
                 mean += img
                 mean_sqr += numpy.square(img)
         self.mean = mean / N

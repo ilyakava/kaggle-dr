@@ -186,5 +186,18 @@ def get():
                         default=1,
                         choices=[0,1],
                         help="If you do not have a GPU, you must pass '-cc 0' (and don't forget to set THEANO_FLAGS='device=cpu'). If 1: use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
+    parser.add_argument("-k1",
+                        "--pre-train-crop",
+                        type=str,
+                        default='no_crop',
+                        help="Name of method that returns integers ranges to crop an image by.")
+    parser.add_argument("-k2",
+                        "--train-crop",
+                        type=str,
+                        default='no_crop')
+    parser.add_argument("-k3",
+                        "--valid-test-crop",
+                        type=str,
+                        default='no_crop')
 
     return parser.parse_args()
