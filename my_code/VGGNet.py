@@ -413,7 +413,7 @@ class VGGNet(object):
             batch_valid_loss, prediction = self.validate_batch(j)
             batch_valid_losses.append(batch_valid_loss)
             valid_predictions.extend(prediction)
-        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions))
+        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions), K=self.ds.K)
         val_loss = numpy.mean(batch_valid_losses)
         # housekeeping
         self.historical_val_losses.append([self.iter, val_loss])
