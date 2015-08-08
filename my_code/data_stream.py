@@ -249,7 +249,6 @@ class DataStream(object):
         """
         :type image: string
         """
-        print image_name
         as_grey = True if self.image_shape[2] == 1 else False
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
         img = self.crop_image(img, crop_lambda)
