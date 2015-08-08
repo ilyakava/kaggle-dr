@@ -13,6 +13,10 @@ def get():
                         "--train-dataset",
                         type=str,
                         default="data/train/centered_crop/")
+    parser.add_argument("-V",
+                        "--train-labels-csv-path",
+                        type=str,
+                        default="data/train/trainLabels.csv")
     parser.add_argument("-b",
                         "--batch-size",
                         type=int,
@@ -44,7 +48,7 @@ def get():
     parser.add_argument("-x",
                         "--max-epochs",
                         type=int,
-                        default=60)
+                        default=150)
     parser.add_argument("-A",
                         "--amplify",
                         type=int,
@@ -186,5 +190,18 @@ def get():
                         default=1,
                         choices=[0,1],
                         help="If you do not have a GPU, you must pass '-cc 0' (and don't forget to set THEANO_FLAGS='device=cpu'). If 1: use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
+    parser.add_argument("-k1",
+                        "--pre-train-crop",
+                        type=str,
+                        default='center_crop',
+                        help="Name of method that returns integers ranges to crop an image by.")
+    parser.add_argument("-k2",
+                        "--train-crop",
+                        type=str,
+                        default='center_crop')
+    parser.add_argument("-k3",
+                        "--valid-test-crop",
+                        type=str,
+                        default='center_crop')
 
     return parser.parse_args()

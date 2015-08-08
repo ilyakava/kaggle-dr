@@ -5,11 +5,13 @@ import numpy
 
 import pdb
 
+DEFAULT_COUNT_CLASSES = 5
+
 class BlockDesigner(object):
     """
     Serves batches with the same distribution of labels in each batch
     """
-    def __init__(self, source, K=5, seed=None):
+    def __init__(self, source, K=DEFAULT_COUNT_CLASSES, seed=None):
         """
         :type source: string or dict[int->list[str]]
         :param source: name of a csv or the output of a previous BlockDesigner.break_off_block
@@ -24,10 +26,8 @@ class BlockDesigner(object):
         """
         if seed:
             random.seed(seed)
-        self.K = K
+        self.K = 0
         self.reservoir = {} # will act as our pool that slowly drains, a source for blocks
-        for k in xrange(self.K):
-            self.reservoir[k] = []
 
         if type(source) is dict:
             self.fill_reservoir_with_dict(source)
@@ -36,11 +36,28 @@ class BlockDesigner(object):
         else:
             raise ValueError("unsupported data source: %s" % str(type(source)))
 
+        # add in some classes if they are missing in the data, but don't take any away
+        self.K = max(K, self.K) # this means the minimum number of classes is K
+        self.enforce_contiguous_reservoir()
+
         self.reference = self.invert_reservoir()
         self.init_size = self.size()
         # We put the proportions in reverse order because the pathological observations
         # are substancialy less frequent (sever diagnosis -> higher class number)
         self.proportions = numpy.array([(len(self.reservoir[klass]) / float(self.init_size)) for klass in reversed(xrange(self.K))])
+
+    def enforce_contiguous_reservoir(self):
+        for y in range(self.K):
+            if not self.reservoir.get(y):
+                self.reservoir[y] = []
+
+    def safe_insert(self, y,id):
+        if self.reservoir.get(y):
+            self.reservoir[y].append(id)
+        else:
+            self.reservoir[y] = [id]
+            # we don't just add 1 here b/c the labels may be discontinuous
+            self.K = max(self.K,y+1) # we assume labelling starts at zero
 
     def fill_reservoir_with_csv(self, label_csv):
         with open(label_csv, 'rb') as csvfile:
@@ -49,8 +66,9 @@ class BlockDesigner(object):
             for row in reader:
                 id = row[0]
                 y = int(row[1])
+                self.safe_insert(y,id)
 
-                self.reservoir[y].append(id)
+
 
     def fill_reservoir_with_dict(self, source):
         assert(type(source.keys()[0]) is int)
@@ -58,7 +76,7 @@ class BlockDesigner(object):
         assert(type(source.values()[0][0]) is str)
         for y, ids in source.items():
             for id in ids:
-                self.reservoir[y].append(id)
+                self.safe_insert(y,id)
 
     def invert_reservoir(self):
         reference = {}

@@ -1,3 +1,45 @@
+This repository contains code written for the [Kaggle Diabetic Retinopathy](https://www.kaggle.com/c/diabetic-retinopathy-detection/leaderboard) challenge, and achieved 20th place out of 661 competitors. Read more about the challenge and the creation of this repository [here](http://ilyakava.tumblr.com/post/125230881527/my-1st-kaggle-convnet-getting-to-3rd-percentile).
+
+While I competed in the challenge, this project evolved into my personal general purpose framework for training Deep Convolutional Neural Networks. It is built on top of [theano](http://deeplearning.net/software/theano/), [Lasagne](http://lasagne.readthedocs.org/en/latest/#), [pylearn2](http://deeplearning.net/software/pylearn2/) and many other general purpose python libraries.
+
+**Features in this framework:**
+
+- network architecture via json
+    - nonlinearities, initialization, CONV filters, FC size, CONV+FC dropout+(pooling size+stride+overlap), and padding
+- data augmentation (`cmd` line options)
+    - color casting
+    - flipping
+    - jittering
+- data handling
+    - image normalize/standardization (`cmd` line option)
+    - automated creation of image conversion batch files
+    - streaming and caching multiple minibatches in GPU (i.e. macrobatches) (`cmd` line option)
+    - easy restoring of network parameters: easy to pause then continue training at a later time (`cmd` line option)
+    - control over class balance per minibatch (`cmd` line option)
+        - classes automatically evenly distributed throughout minibatches
+        - custom class (im)balance specifiable
+    - consistent training/validation sets by default (`cmd` line option)
+    - minibatch shuffling (`cmd` line option)
+- evaluation
+    - automatic autosave of best results during training
+    - plotting CONV layer weights
+    - occlusion heatmap studies
+    - plotting network results
+    - prediction from 1 or more models (`cmd` line option)
+- misc `cmd` line options
+    - multiple error functions
+        - cross+relative entropy
+        - nnrank
+        - mse
+        - error function code is easy to swap
+    - learning rate, flipping noise decay controllable
+    - color/grayscale switching
+    - number output classes configurable
+    - label/image source
+    - CPU or GPU
+    - c01b or bc01
+    - detects if fundus image was taken with indirect or direct ophthalmoscope with 90% accuracy (using identification tab from indirect ophthalmoscopes)
+
 # Getting Started
 
 ## Code (tested on Ubuntu 14.10)
@@ -44,7 +86,7 @@ export PATH=/usr/local/cuda-7.0/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda-7.0/lib64:$LD_LIBRARY_PATH
 ```
 
-## Data
+## Competition Data
 
 ### Install
 
@@ -77,7 +119,7 @@ Then follow the on screen directions, which will list what commands to run to pr
 
 Depending on how your CPU schedules, more than 1 batchfile may not result in any speedup (3 is the best size for me however).
 
-## The Network
+## The Competition Network
 
 ### Training the network
 

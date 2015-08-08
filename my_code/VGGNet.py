@@ -76,7 +76,7 @@ class VGGNet(object):
         batch_slice = slice(cache_block_index * self.batch_size, (cache_block_index + 1) * self.batch_size)
 
         self.params = lasagne.layers.get_all_params(self.all_layers[-1])
-        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type)
+        loss_train, loss_valid, pred, raw_out = self.build_loss_predictions(X_batch, y_batch, self.all_layers[-1], loss_type, K=self.ds.K)
         updates = lasagne.updates.nesterov_momentum(loss_train, self.params, learning_rate, momentum)
 
         print("Compiling...")
@@ -153,7 +153,7 @@ class VGGNet(object):
             klass_targets = nnrank_target
         return(theano.shared(lasagne.utils.floatX((klass_targets))),pred_valid)
 
-    def build_loss_predictions(self, X, y, output, loss_type, K=5):
+    def build_loss_predictions(self, X, y, output, loss_type, K):
         train_out = lasagne.layers.get_output(output, X)
         valid_out = lasagne.layers.get_output(output, X, deterministic=True)
         klass_targets, pred_valid = self.build_target_label_prediction(valid_out, loss_type, K)
@@ -379,6 +379,7 @@ class VGGNet(object):
             self.save("%s-bestval" % (self.runid))
         if max(val_kappas[:,1]) == val_kappas[-1,1]:
             self.save("%s-bestkappa" % (self.runid))
+        save_results(self.runid, [[self.historical_train_losses, self.historical_val_losses, self.historical_val_kappas, self.n_train_batches], [self.learning_rate_decayed_epochs]])
 
     def decay_learning_rate(self, patience, factor, limit):
         if (len(self.learning_rate_decayed_epochs) < limit and
@@ -413,7 +414,7 @@ class VGGNet(object):
             batch_valid_loss, prediction = self.validate_batch(j)
             batch_valid_losses.append(batch_valid_loss)
             valid_predictions.extend(prediction)
-        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions))
+        [kappa, M] = QWK(self.valid_y.get_value(borrow=True), numpy.array(valid_predictions), K=self.ds.K)
         val_loss = numpy.mean(batch_valid_losses)
         # housekeeping
         self.historical_val_losses.append([self.iter, val_loss])
@@ -487,7 +488,7 @@ def load_model_specs(network, as_grey, override_input_size):
     return(model_spec, image_shape, pad)
 
 def init_and_train(network, init_learning_rate, momentum, max_epochs, train_dataset,
-                 batch_size, leak_alpha, center, normalize, amplify,
+                 train_labels_csv_path, batch_size, leak_alpha, center, normalize, amplify,
                  as_grey, num_output_classes, decay_patience, decay_factor,
                  decay_limit, loss_type, validations_per_epoch, train_flip,
                  shuffle, test_dataset, random_seed, valid_dataset_size,
@@ -495,14 +496,14 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  valid_flip, test_flip, sample_class, custom_distribution,
                  train_color_cast, valid_color_cast, test_color_cast,
                  color_cast_range, override_input_size, model_file, filter_shape,
-                 cache_size_factor, cuda_convnet):
+                 cache_size_factor, cuda_convnet, pre_train_crop, train_crop, valid_test_crop):
     runid = "%s-%s-%s" % (str(uuid.uuid4())[:8], network, loss_type)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
         print("[INFO] %.2f current epochs equals 1 BlockDesigner epoch" % ((274.0*numpy.array(custom_distribution)) / numpy.array(ACTUAL_TRAIN_DR_PROPORTIONS))[sample_class])
 
     model_spec, image_shape, pad = load_model_specs(network, as_grey, override_input_size)
-    data_stream = DataStream(train_image_dir=train_dataset, image_shape=image_shape, cache_size_factor=cache_size_factor, batch_size=batch_size, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution, train_color_cast=train_color_cast, valid_color_cast=valid_color_cast, test_color_cast=test_color_cast, color_cast_range=color_cast_range)
+    data_stream = DataStream(train_image_dir=train_dataset, train_labels_csv_path=train_labels_csv_path, image_shape=image_shape, cache_size_factor=cache_size_factor, batch_size=batch_size, center=center, normalize=normalize, amplify=amplify, train_flip=train_flip, shuffle=shuffle, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size, valid_flip=valid_flip, test_flip=test_flip, sample_class=sample_class, custom_distribution=custom_distribution, train_color_cast=train_color_cast, valid_color_cast=valid_color_cast, test_color_cast=test_color_cast, color_cast_range=color_cast_range, pre_train_crop=pre_train_crop, train_crop=train_crop, valid_test_crop=valid_test_crop)
 
     if model_file:
         f = open(model_file)
@@ -532,6 +533,7 @@ if __name__ == '__main__':
                 momentum=_.momentum,
                 max_epochs=_.max_epochs,
                 train_dataset=_.train_dataset,
+                train_labels_csv_path=_.train_labels_csv_path,
                 batch_size=_.batch_size,
                 leak_alpha=_.alpha,
                 center=_.center,
@@ -564,4 +566,7 @@ if __name__ == '__main__':
                 model_file=_.model_file,
                 filter_shape=_.filter_shape,
                 cache_size_factor=_.cache_size_factor,
-                cuda_convnet=_.cuda_convnet)
+                cuda_convnet=_.cuda_convnet,
+                pre_train_crop=_.pre_train_crop,
+                train_crop=_.train_crop,
+                valid_test_crop=_.valid_test_crop)
