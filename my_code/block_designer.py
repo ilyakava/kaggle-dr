@@ -24,10 +24,8 @@ class BlockDesigner(object):
         """
         if seed:
             random.seed(seed)
-        self.K = K
+        self.K = 0
         self.reservoir = {} # will act as our pool that slowly drains, a source for blocks
-        for k in xrange(self.K):
-            self.reservoir[k] = []
 
         if type(source) is dict:
             self.fill_reservoir_with_dict(source)
@@ -36,11 +34,21 @@ class BlockDesigner(object):
         else:
             raise ValueError("unsupported data source: %s" % str(type(source)))
 
+        if self.K < K:
+            self.K = K
+
         self.reference = self.invert_reservoir()
         self.init_size = self.size()
         # We put the proportions in reverse order because the pathological observations
         # are substancialy less frequent (sever diagnosis -> higher class number)
         self.proportions = numpy.array([(len(self.reservoir[klass]) / float(self.init_size)) for klass in reversed(xrange(self.K))])
+
+    def safe_insert(y,id):
+        if self.reservoir.get(y):
+            self.reservoir[y].append(id)
+        else:
+            self.reservoir[y] = [id]
+            self.K += 1
 
     def fill_reservoir_with_csv(self, label_csv):
         with open(label_csv, 'rb') as csvfile:
@@ -49,8 +57,9 @@ class BlockDesigner(object):
             for row in reader:
                 id = row[0]
                 y = int(row[1])
+                self.safe_insert(y,id)
 
-                self.reservoir[y].append(id)
+
 
     def fill_reservoir_with_dict(self, source):
         assert(type(source.keys()[0]) is int)
@@ -58,7 +67,7 @@ class BlockDesigner(object):
         assert(type(source.values()[0][0]) is str)
         for y, ids in source.items():
             for id in ids:
-                self.reservoir[y].append(id)
+                self.safe_insert(y,id)
 
     def invert_reservoir(self):
         reference = {}
