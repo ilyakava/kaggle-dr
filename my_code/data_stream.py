@@ -268,6 +268,7 @@ class DataStream(object):
         return self.amplify * image
 
     def crop_image(self, img, crop_lambda):
+        pdb.set_trace()
         t,b,l,r = crop_lambda(img)
         assert(b-t == self.image_shape[0])
         assert(r-l == self.image_shape[1])
