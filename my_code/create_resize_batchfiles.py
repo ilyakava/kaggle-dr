@@ -55,7 +55,8 @@ def resize_smaller_dim_batchfile(files, size, in_dir, out_dir, index):
     out = open(name, 'w')
     for f_ in files:
         f = '.'.join([f_.split('.')[0], 'png'])
-        cmd = 'convert %s%s -scale %ix%i^ -format png -quality 100 %s%s\n' % (in_dir, f_, size, size, out_dir, f)
+        three_chans = "-depth 8 -type TrueColor" # guarantees three color channels even if image is in grayscale
+        cmd = 'convert %s%s -scale %ix%i^ -format png -quality 100 %s %s%s\n' % (in_dir, f_, size, size, three_chans, out_dir, f)
         out.write (cmd)
     out.close()
     return name
