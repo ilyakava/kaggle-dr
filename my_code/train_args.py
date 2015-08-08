@@ -44,7 +44,7 @@ def get():
     parser.add_argument("-x",
                         "--max-epochs",
                         type=int,
-                        default=60)
+                        default=150)
     parser.add_argument("-A",
                         "--amplify",
                         type=int,
