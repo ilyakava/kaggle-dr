@@ -119,8 +119,6 @@ class ColorCastOracle(object):
             "baidu_cast": self.baidu_cast
         }[mode]
 
-TRAIN_LABELS_CSV_PATH = "data/train/trainLabels.csv"
-
 class DataStream(object):
     """
     Provides an interface for easily filling and replacing GPU cache of images
@@ -177,7 +175,9 @@ class DataStream(object):
         self.train_crop_lambda = crop_oracle.get_crop_lambda(train_crop)
         self.valid_test_crop_lambda = crop_oracle.get_crop_lambda(valid_test_crop)
 
-        bd = BlockDesigner(TRAIN_LABELS_CSV_PATH, seed=self.random_seed)
+        # look for label csv 1 dir above training dir
+        train_labels_csv_path = "%s/trainLabels.csv" % '/'.join(train_image_dir.split('/')[:-2])
+        bd = BlockDesigner(train_labels_csv_path, seed=self.random_seed)
 
         valid_examples = bd.break_off_block(self.valid_dataset_size)
         self.train_examples = bd.remainder()
