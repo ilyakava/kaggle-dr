@@ -197,8 +197,8 @@ class DataStream(object):
     def valid_set(self):
         all_val_images = numpy.zeros(((len(self.valid_dataset["y"]),) + self.image_shape), dtype=theano.config.floatX)
         for i, image in enumerate(self.valid_dataset["X"]):
-            all_val_images[i, ...] = self.feed_image(image, self.train_image_dir, self.valid_flip_lambda,
-                                                     self.valid_color_cast_lambda, self.valid_test_crop_lambda) # b01c, Theano: bc01 CudaConvnet: c01b
+            all_val_images[i, ...] = self.feed_image(image, self.train_image_dir, self.valid_test_crop_lambda,
+                                                     self.valid_flip_lambda, self.valid_color_cast_lambda) # b01c, Theano: bc01 CudaConvnet: c01b
         return numpy.rollaxis(all_val_images, 3, 1), numpy.array(self.valid_dataset["y"], dtype='int32')
 
     def train_buffer(self, new_flip_noise=None):
@@ -216,8 +216,8 @@ class DataStream(object):
             ith_cache_block_end = (ith_cache_block + 1) * self.cache_size
             ith_cache_block_slice = slice(ith_cache_block * self.cache_size, ith_cache_block_end)
             for i, image in enumerate(train_dataset["X"][ith_cache_block_slice]):
-                x_cache_block[i, ...] = self.feed_image(image, self.train_image_dir, self.train_flip_lambda,
-                                                        self.train_color_cast_lambda, self.train_crop_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.train_image_dir, self.train_crop_lambda,
+                                                        self.train_flip_lambda, self.train_color_cast_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(train_dataset["y"][ith_cache_block_slice], dtype='int32')
 
     def test_buffer(self):
@@ -233,16 +233,16 @@ class DataStream(object):
             ith_cache_block_slice = slice(ith_cache_block * self.cache_size, ith_cache_block_end)
             idxs_to_full_dataset = list(range(ith_cache_block * self.cache_size, ith_cache_block_end))
             for i, image in enumerate(self.test_dataset["X"][ith_cache_block_slice]):
-                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda,
-                                                        self.test_color_cast_lambda, self.valid_test_crop_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.valid_test_crop_lambda,
+                                                        self.test_flip_lambda, self.test_color_cast_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
         # sneak the leftovers out, padded by the previous full cache block
         if n_leftovers:
             leftover_slice = slice(ith_cache_block_end, ith_cache_block_end + n_leftovers)
             for i, image in enumerate(self.test_dataset["X"][leftover_slice]):
                 idxs_to_full_dataset[i] = ith_cache_block_end + i
-                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.test_flip_lambda,
-                                                        self.test_color_cast_lambda, self.valid_test_crop_lambda)
+                x_cache_block[i, ...] = self.feed_image(image, self.test_image_dir, self.valid_test_crop_lambda,
+                                                        self.test_flip_lambda, self.test_color_cast_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
 
     def read_image(self, image_name, image_dir, crop_lambda, extension=".png"):
@@ -268,7 +268,6 @@ class DataStream(object):
         return self.amplify * image
 
     def crop_image(self, img, crop_lambda):
-        pdb.set_trace()
         t,b,l,r = crop_lambda(img)
         assert(b-t == self.image_shape[0])
         assert(r-l == self.image_shape[1])
