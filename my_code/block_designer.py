@@ -56,7 +56,8 @@ class BlockDesigner(object):
             self.reservoir[y].append(id)
         else:
             self.reservoir[y] = [id]
-            self.K += 1
+            # we don't just add 1 here b/c the labels may be discontinuous
+            self.K = max(self.K,y+1) # we assume labelling starts at zero
 
     def fill_reservoir_with_csv(self, label_csv):
         with open(label_csv, 'rb') as csvfile:
@@ -118,9 +119,6 @@ class BlockDesigner(object):
             random_additions = random.sample(self.ids(), num_random_additions)
             for id in random_additions:
                 y = self.reference[id]
-                print("(i,y) (%i,%i)" % (i,y))
-                if y == 9:
-                    pdb.set_trace()
                 blocks[i][y] = blocks[i][y] + [id]
                 self.reservoir[y].remove(id)
         return blocks
