@@ -118,6 +118,7 @@ class BlockDesigner(object):
             random_additions = random.sample(self.ids(), num_random_additions)
             for id in random_additions:
                 y = self.reference[id]
+                print("(i,y) (%i,%i)", % (i,y))
                 blocks[i][y] = blocks[i][y] + [id]
                 self.reservoir[y].remove(id)
         return blocks
