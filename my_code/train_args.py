@@ -13,6 +13,10 @@ def get():
                         "--train-dataset",
                         type=str,
                         default="data/train/centered_crop/")
+    parser.add_argument("-V",
+                        "--train-labels-csv-path",
+                        type=str,
+                        default="data/train/trainLabels.csv")
     parser.add_argument("-b",
                         "--batch-size",
                         type=int,

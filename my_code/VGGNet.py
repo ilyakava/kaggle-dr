@@ -488,7 +488,7 @@ def load_model_specs(network, as_grey, override_input_size):
     return(model_spec, image_shape, pad)
 
 def init_and_train(network, init_learning_rate, momentum, max_epochs, train_dataset,
-                 batch_size, leak_alpha, center, normalize, amplify,
+                 train_labels_csv_path, batch_size, leak_alpha, center, normalize, amplify,
                  as_grey, num_output_classes, decay_patience, decay_factor,
                  decay_limit, loss_type, validations_per_epoch, train_flip,
                  shuffle, test_dataset, random_seed, valid_dataset_size,
@@ -533,6 +533,7 @@ if __name__ == '__main__':
                 momentum=_.momentum,
                 max_epochs=_.max_epochs,
                 train_dataset=_.train_dataset,
+                train_labels_csv_path=_.train_labels_csv_path,
                 batch_size=_.batch_size,
                 leak_alpha=_.alpha,
                 center=_.center,

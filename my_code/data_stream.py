@@ -124,6 +124,7 @@ class DataStream(object):
     """
     def __init__(self,
                  train_image_dir="data/train/centered_crop/",
+                 train_labels_csv_path="data/train/trainLabels.csv",
                  image_shape=(128, 128, 3),
                  batch_size=128,
                  cache_size_factor=8,
@@ -174,8 +175,6 @@ class DataStream(object):
         self.train_crop_lambda = crop_oracle.get_crop_lambda(train_crop)
         self.valid_test_crop_lambda = crop_oracle.get_crop_lambda(valid_test_crop)
 
-        # look for label csv 1 dir above training dir
-        train_labels_csv_path = "%s/trainLabels.csv" % '/'.join(train_image_dir.split('/')[:-2])
         bd = BlockDesigner(train_labels_csv_path, seed=self.random_seed)
         self.K = bd.K
 
