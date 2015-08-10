@@ -250,7 +250,6 @@ class DataStream(object):
         :type image: string
         """
         as_grey = True if self.image_shape[2] == 1 else False
-        print(image_name)
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
         img = self.crop_image(img, crop_lambda)
         return (img.reshape(self.image_shape) / 255.) # reshape in case it is as_grey
