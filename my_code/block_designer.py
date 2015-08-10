@@ -119,6 +119,8 @@ class BlockDesigner(object):
             for id in random_additions:
                 y = self.reference[id]
                 print("(i,y) (%i,%i)" % (i,y))
+                if y == 9:
+                    pdb.set_trace()
                 blocks[i][y] = blocks[i][y] + [id]
                 self.reservoir[y].remove(id)
         return blocks
