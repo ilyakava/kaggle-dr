@@ -11,7 +11,7 @@ class BlockDesigner(object):
     """
     Serves batches with the same distribution of labels in each batch
     """
-    def __init__(self, source, K=DEFAULT_COUNT_CLASSES, seed=None):
+    def __init__(self, source, minK=DEFAULT_COUNT_CLASSES, seed=None):
         """
         :type source: string or dict[int->list[str]]
         :param source: name of a csv or the output of a previous BlockDesigner.break_off_block
@@ -37,13 +37,19 @@ class BlockDesigner(object):
             raise ValueError("unsupported data source: %s" % str(type(source)))
 
         # add in some classes if they are missing in the data, but don't take any away
-        self.K = max(K, self.K)
+        self.K = max(minK, self.K)
+        self.enforce_contiguous_reservoir()
 
         self.reference = self.invert_reservoir()
         self.init_size = self.size()
         # We put the proportions in reverse order because the pathological observations
         # are substancialy less frequent (sever diagnosis -> higher class number)
         self.proportions = numpy.array([(len(self.reservoir[klass]) / float(self.init_size)) for klass in reversed(xrange(self.K))])
+
+    def enforce_contiguous_reservoir(self):
+        for y in range(self.K):
+            if not self.reservoir.get(y):
+                self.reservoir[y] = []
 
     def safe_insert(self, y,id):
         if self.reservoir.get(y):
