@@ -379,6 +379,7 @@ class VGGNet(object):
             self.save("%s-bestval" % (self.runid))
         if max(val_kappas[:,1]) == val_kappas[-1,1]:
             self.save("%s-bestkappa" % (self.runid))
+        save_results(self.runid, [[self.historical_train_losses, self.historical_val_losses, self.historical_val_kappas, self.n_train_batches], [self.learning_rate_decayed_epochs]])
 
     def decay_learning_rate(self, patience, factor, limit):
         if (len(self.learning_rate_decayed_epochs) < limit and
