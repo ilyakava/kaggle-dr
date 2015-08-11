@@ -251,8 +251,12 @@ class DataStream(object):
         """
         as_grey = True if self.image_shape[2] == 1 else False
         img = imread(image_dir + image_name + extension, as_grey=as_grey)
-        img = self.crop_image(img, crop_lambda)
-        return (img.reshape(self.image_shape) / 255.) # reshape in case it is as_grey
+        img = self.crop_image(img, crop_lambda) if crop_lambda else img
+        img = img / 255.
+        if len(img.shape) == 2:
+            return img.reshape(img.shape + (1,)) # when grey, img might lack dimension
+        else:
+            return img
 
     def preprocess_image(self, image, flip_coords, color_cast):
         """

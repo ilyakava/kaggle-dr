@@ -32,7 +32,7 @@ def get():
                         default='no_flip',
                         help="Method name or csv file that contains complete information on whether to flip a given training image.")
     parser.add_argument("-D",
-                        "--test-path",
+                        "--test-imagepath",
                         type=str,
                         default=None,
                         help="Either a path to an image file (with extension) or directory of images.")
@@ -62,5 +62,26 @@ def get():
                         default=1,
                         choices=[0,1],
                         help="If you do not have a GPU, you must pass '-cc 0' (and don't forget to set THEANO_FLAGS='device=cpu'). If 1: use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
+    parser.add_argument("-i",
+                        "--itr-per-octave",
+                        type=int,
+                        default=10)
+    parser.add_argument("-s",
+                        "--step-size",
+                        type=float,
+                        default=1.0)
+    parser.add_argument("-o",
+                        "--max-octaves",
+                        type=int,
+                        default=4)
+    parser.add_argument("-S",
+                        "--octave-scale",
+                        type=float,
+                        default=1.4)
+    parser.add_argument("-l",
+                        "--layer-idx-of-interest",
+                        type=int,
+                        default=20,
+                        help="For vgg_mini7b_leak_sig_ecp, CONV layers are: [2,5,8,10,13,16]")
 
     return parser.parse_args()
