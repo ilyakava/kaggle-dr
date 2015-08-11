@@ -132,13 +132,14 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
         batch[0] = column.ds.feed_image(image_name=test_path, image_dir='')
         reshaped_batch = numpy.rollaxis(batch, 3, 1)
         column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
-        while itr < max_itr:
-            if (itr in [0,1,2,5,10,50,100,150,200,250,300]):
+
+        while itr =< max_itr:
+            if (itr in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_itr),10)])):
                 name = 'data/dreams/%i_itr.png' % itr
                 print("saving %s" % name)
                 scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
 
-            step_size = 1 # the biggest change in the image will be this percent increase/decrease
+            step_size = 0.5 # the biggest change in the image will be this percent increase/decrease
             batch_updates = column.dream_batch(1)
             reshaped_batch += ((step_size*numpy.abs(reshaped_batch).max())/numpy.abs(batch_updates).max()) * batch_updates
             column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
