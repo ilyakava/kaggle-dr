@@ -104,7 +104,8 @@ class VGGNet(object):
             },
         )
 
-        layer_idx_of_interest = T.iscalar('cache_block_index')
+        layer_idx_of_interest = T.iscalar('layer_idx_of_interest')
+        pdb.set_trace()
         l2_activations = (lasagne.layers.get_all_params(self.all_layers[layer_idx_of_interest]) ** 2).sum()
         dream_updates = lasagne.updates.sgd(-l2_activations, X_batch, learning_rate)
         self.dream_batch = theano.function(
