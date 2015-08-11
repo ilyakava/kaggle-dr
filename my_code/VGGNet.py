@@ -104,6 +104,19 @@ class VGGNet(object):
             },
         )
 
+        layer_idx_of_interest = T.iscalar('cache_block_index')
+        l2_activations = (lasagne.layers.get_all_params(self.all_layers[layer_idx_of_interest]) ** 2).sum()
+        dream_updates = lasagne.updates.sgd(-l2_activations, X_batch, learning_rate)
+        self.dream_batch = theano.function(
+            [cache_block_index, layer_idx_of_interest],
+            [dream_updates],
+            givens={
+                X_batch: self.x_buffer[batch_slice],
+            }
+        )
+
+
+
     def widths_and_total_num_parameters(self, filter_shape):
         # http://cs231n.github.io/convolutional-networks/
         _c01 = slice(0,-1) if filter_shape == 'c01b' else slice(1,5)
