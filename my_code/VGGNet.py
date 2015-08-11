@@ -106,8 +106,8 @@ class VGGNet(object):
 
         layer_idx_of_interest = 5
         my_input = X_batch
-        l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input) ** 2)
-        dream_updates = lasagne.updates.sgd(l2_activations, [my_input], learning_rate)
+        l2_activations = T.mean(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input) ** 2)
+        dream_updates = lasagne.updates.sgd(-l2_activations, [my_input], learning_rate)
         self.dream_batch = theano.function(
             [learning_rate],
             dream_updates.values()[0],
