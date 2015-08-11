@@ -128,16 +128,14 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
 
     try:
         itr = 0
+        batch = numpy.zeros((1,) + column.ds.image_shape)
+        batch[0] = column.ds.feed_image(image_name=test_path, image_dir='')
+        reshaped_batch = numpy.rollaxis(batch, 3, 1)
+        column.x_buffer.set_value(lasagne.utils.floatX(batch), borrow=True)
         while itr < max_itr:
-            batch = numpy.zeros((1,) + column.ds.image_shape)
-            batch[0] = column.ds.feed_image(image_name=test_path, image_dir='')
-            reshaped_batch = numpy.rollaxis(batch, 3, 1)
-
-            column.x_buffer.set_value(lasagne.utils.floatX(batch), borrow=True)
-            batch_updates = self.dream_batch(0)
-
-            batch += dream_updates
+            self.dream_batch(0)
             itr += 1
+
         pdb.set_trace()
         scipy.misc.toimage(layer_img).save('data/dreams/%i_itr.png' % itr, "PNG")
     except KeyboardInterrupt:
