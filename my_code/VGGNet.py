@@ -105,18 +105,16 @@ class VGGNet(object):
         )
 
         layer_idx_of_interest = 5
-        l2_activations = T.mean(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], X_batch) ** 2)
-        dream_updates = lasagne.updates.sgd(-l2_activations, [X_batch], learning_rate)
-        pdb.set_trace()
+        my_input = X_batch
+        l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input) ** 2)
+        dream_updates = lasagne.updates.sgd(-l2_activations, [my_input], learning_rate)
         self.dream_batch = theano.function(
-            [],
-            [dream_updates.values()[0]],
+            [learning_rate],
+            dream_updates.values()[0],
             givens={
-                X_batch: self.x_buffer,
+                X_batch: self.x_buffer
             }
         )
-
-
 
     def widths_and_total_num_parameters(self, filter_shape):
         # http://cs231n.github.io/convolutional-networks/
