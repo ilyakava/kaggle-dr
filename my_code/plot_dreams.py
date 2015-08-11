@@ -133,18 +133,18 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
         reshaped_batch = numpy.rollaxis(batch, 3, 1)
         column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
         while itr < max_itr:
+            if (itr in [0,1,2,5,10,50,100,150,200]):
+                name = 'data/dreams/%i_itr.png' % itr
+                print("saving %s" % name)
+                scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
 
-            learning_rate = 1
+            learning_rate = 0.5
             batch_updates = column.dream_batch(learning_rate)
             reshaped_batch += batch_updates
             column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
 
             itr += 1
 
-            if (itr in [10,50,100,150,200]):
-                name = 'data/dreams/%i_itr.png' % itr
-                print("saving %s" % name)
-                scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
     except KeyboardInterrupt:
         print "[ERROR] User terminated Dream Study"
     print "Done"
