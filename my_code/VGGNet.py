@@ -103,7 +103,7 @@ class VGGNet(object):
                 X_batch: self.x_buffer[batch_slice],
             },
         )
-
+        pdb.set_trace()
         layer_idx_of_interest = 5
         my_input = X_batch
         l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True) ** 2)
