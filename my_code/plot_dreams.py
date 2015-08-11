@@ -147,6 +147,7 @@ if __name__ == '__main__':
            test_path=_.test_path,
            max_itr=_.max_itr,
            train_dataset=_.train_dataset,
+           train_labels_csv_path=_.train_labels_csv_path,
            center=_.center,
            normalize=_.normalize,
            train_flip=_.train_flip,

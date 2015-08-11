@@ -12,6 +12,10 @@ def get():
                         type=str,
                         default="data/train/centered_crop/",
                         help="This is needed to calculate the centering and standardization images to subtract and divide the test examples with.")
+    parser.add_argument("-V",
+                        "--train-labels-csv-path",
+                        type=str,
+                        default="data/train/trainLabels.csv")
     parser.add_argument("-c",
                         "--center",
                         type=int,
