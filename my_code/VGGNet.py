@@ -110,7 +110,6 @@ class VGGNet(object):
         self.dream_batch = theano.function(
             [cache_block_index],
             [dream_updates.values()[0]],
-            updates=dream_updates,
             givens={
                 X_batch: self.x_buffer[batch_slice],
             }
