@@ -140,7 +140,7 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
 
             step_size = 1.5
             batch_updates = column.dream_batch(1)
-            reshaped_batch -= (step_size/numpy.abs(batch_updates).mean()) * batch_updates
+            reshaped_batch += (step_size/numpy.abs(batch_updates).mean()) * batch_updates
             column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
 
             itr += 1
