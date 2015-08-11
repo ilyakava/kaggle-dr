@@ -133,7 +133,7 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
         reshaped_batch = numpy.rollaxis(batch, 3, 1)
         column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
         while itr < max_itr:
-            if (itr in [0,1,2,5,10,50,100,150,200]):
+            if (itr in [0,1,2,5,10,50,100,150,200,250,300]):
                 name = 'data/dreams/%i_itr.png' % itr
                 print("saving %s" % name)
                 scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
