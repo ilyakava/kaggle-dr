@@ -108,6 +108,35 @@ import pdb
 #     else:
 #         raise e
 
+# Layers to choose:
+
+# 1: ShuffleBC01ToC01BLayer
+# 2: Conv2DCCLayer
+# 3: MaxPool2DCCLayer
+# 4: DropoutLayer
+# 5: Conv2DCCLayer
+# 6: MaxPool2DCCLayer
+# 7: DropoutLayer
+# 8: Conv2DCCLayer
+# 9: DropoutLayer
+# 10: Conv2DCCLayer
+# 11: MaxPool2DCCLayer
+# 12: DropoutLayer
+# 13: Conv2DCCLayer
+# 14: MaxPool2DCCLayer
+# 15: DropoutLayer
+# 16: Conv2DCCLayer
+# 17: MaxPool2DCCLayer
+# 18: ShuffleC01BToBC01Layer
+# 19: DropoutLayer
+# 20: DenseLayer
+# 21: FeaturePoolLayer
+# 22: DropoutLayer
+# 23: DenseLayer
+# 24: FeaturePoolLayer
+# 25: DropoutLayer
+# 26: DenseLayer
+
 def load_column(model_file, batch_size, learning_rate, train_dataset, train_labels_csv_path, center, normalize, train_flip,
                 test_dataset, random_seed, valid_dataset_size, filter_shape, cuda_convnet):
     print("Loading Model...")
