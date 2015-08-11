@@ -108,10 +108,10 @@ class VGGNet(object):
         l2_activations = T.mean(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], X_batch) ** 2)
         dream_updates = lasagne.updates.sgd(-l2_activations, [X_batch], learning_rate)
         self.dream_batch = theano.function(
-            [cache_block_index],
+            [],
             [dream_updates.values()[0]],
             givens={
-                X_batch: self.x_buffer[batch_slice],
+                X_batch: self.x_buffer,
             }
         )
 
