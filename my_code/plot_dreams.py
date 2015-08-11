@@ -123,9 +123,6 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
 
     column = load_column(model_file, batch_size=1, learning_rate=1, **kwargs)
 
-    drm = DreamStudy(column.ds, test_path)
-    layer_idx_of_interest = 7
-
     try:
         itr = 0
         batch = numpy.zeros((1,) + column.ds.image_shape)
