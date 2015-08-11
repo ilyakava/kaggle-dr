@@ -138,7 +138,7 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
                 print("saving %s" % name)
                 scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
 
-            step_size = 1.5
+            step_size = 0.015
             batch_updates = column.dream_batch(1)
             reshaped_batch += (step_size/numpy.abs(batch_updates).mean()) * batch_updates
             column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
