@@ -23,15 +23,92 @@ import scipy.misc
 
 import pdb
 
-# class DreamStudy(object):
-#     def __init__(self, data_stream, test_imagepath=None):
-#         """
+def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4):
+    # find octave sizes
+    # array of [h,w] arrays
+    octave_sizes = [list(source_size)]
+    while len(octave_sizes) < max_octaves and min(octave_sizes[-1]) > nn_image_size:
+        min_dim = min(octave_sizes[-1])
+        scale = min(octave_scale, float(min_dim) / nn_image_size)
 
-#         """
+        new_dims = [int(dim / scale) for dim in octave_sizes[-1]]
+        octave_sizes.append(new_dims)
+    assert(numpy.array(octave_sizes).min() >= nn_image_size)
+
+    # calculate tile limits per octave (and normalizing coefs)
+    octave_tile_corners = []
+    for size in octave_sizes:
+        h,w = size
+
+        n_minus1_tiles_h, nth_tile_offset_h = divmod(h, nn_image_size)
+        tops = [nn_image_size * i for i in range(n_minus1_tiles_h)]
+        tops.append(tops[-1]+nth_tile_offset_h)
+
+        n_minus1_tiles_w, nth_tile_offset_w = divmod(w, nn_image_size)
+        lefts = [nn_image_size * i for i in range(n_minus1_tiles_w)]
+        lefts.append(lefts[-1]+nth_tile_offset_w)
+
+        tile_corners = []
+        for top in tops:
+            for left in lefts:
+                tile_corners.append([top,left])
+        octave_tile_corners.append(tile_corners)
+    return(octave_sizes,octave_tile_corners)
+
+# class DreamStudyBuffer(object):
+#     """
+#     Keeps the state of the dream in a double buffer
+#     (source->batch, batch_output->source, and repeat)
+#     """
+
+#     def __init__(self, data_stream, test_imagepath=None):
+#         OCTAVE_SCALE = 1.4
+#         MAX_OCTAVES = 4
+#         NN_IMG_SIZE = data_stream.image_shape[0]
+
+#         # input image
+#         source = data_stream.feed_image(image_name=test_imagepath, image_dir='')
+
+
+
+#         # resize source for octave images (another function) cur_octaves
+#         # with another function: initialize self.batch by tiling self.cur_octaves
+
+#         # --- write to source
+
+#         # map back gradients to each octave and normalize
+
+#         # enlarge each octave to original image size
+
+#         # update source image
+
+#         # --- reset batch from new source
+
+#         # reset batch from new source image
+
+#         self.octave_images
+#         self.octave_tiles
+
+
+#         assert(occlusion_patch_size % 2 == 1) # for simplicity
 #         self.ds = data_stream
+#         self.occlusion_patch_size = occlusion_patch_size
 #         self.test_imagepath = test_imagepath
 
-#     def buffer_dream_dataset(self):
+#         patched_img_pad = (occlusion_patch_size - 1) / 2
+#         patched_img_dim = data_stream.image_shape[0] - patched_img_pad*2
+#         self.num_patch_centers = (patched_img_dim)**2 # number of images in test set
+
+#         self.patch_starts = [divmod(n, patched_img_dim) for n in xrange(self.num_patch_centers)]
+
+#     def nth_patch(self, n):
+#         i_start,j_start = self.patch_starts[n]
+#         i_end = i_start + self.occlusion_patch_size
+#         j_end = j_start + self.occlusion_patch_size
+
+#         return(i_start,i_end,j_start,j_end)
+
+#     def buffer_occluded_dataset(self):
 #         assert(self.test_imagepath)
 #         img = self.ds.feed_image(image_name=self.test_imagepath, image_dir='')
 #         channel_means = img.mean(axis=(0,1))
@@ -91,22 +168,6 @@ import pdb
 #         grid.axes_llc.set_yticks([])
 #         print("Saving figure as: %s" % outpath)
 #         plt.savefig(outpath, dpi=600, bbox_inches='tight')
-
-# def file_iter(test_path):
-#     """
-#     Iterates through full paths of images.
-#     """
-#     e = ValueError("'%s' is neither a file nor a directory of images" % test_path)
-#     if path.isdir(test_path):
-#         images = [path.splitext(f)[0] for f in listdir(test_path) if re.search('\.(jpeg|png)', f)]
-#         if not len(images):
-#             raise e
-#         for image in images:
-#             yield test_path + image
-#     elif path.isfile(test_path):
-#         yield path.splitext(test_path)[0]
-#     else:
-#         raise e
 
 # Layers to choose:
 
