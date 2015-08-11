@@ -140,7 +140,7 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
 
             learning_rate = 0.5
             batch_updates = column.dream_batch(learning_rate)
-            reshaped_batch += batch_updates
+            reshaped_batch -= batch_updates
             column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
 
             itr += 1
