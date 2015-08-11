@@ -11,6 +11,7 @@ import cPickle
 # from mpl_toolkits.axes_grid1 import AxesGrid
 
 import theano
+import lasagne
 
 from my_code.VGGNet import VGGNet
 from my_code.data_stream import DataStream
