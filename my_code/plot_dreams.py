@@ -19,6 +19,8 @@ from my_code.data_stream import DataStream
 import my_code.dream_args as args
 from my_code.predict import model_runid
 
+import scipy.misc
+
 import pdb
 
 # class DreamStudy(object):
@@ -138,8 +140,11 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
             column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
 
             itr += 1
-        pdb.set_trace()
-        scipy.misc.toimage(layer_img).save('data/dreams/%i_itr.png' % itr, "PNG")
+
+            if (itr in [10,50,100,150,200]):
+                name = 'data/dreams/%i_itr.png' % itr
+                print("saving %s" % name)
+                scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
     except KeyboardInterrupt:
         print "[ERROR] User terminated Dream Study"
     print "Done"
