@@ -12,6 +12,9 @@ import cPickle
 
 import theano
 
+from my_code.VGGNet import VGGNet
+from my_code.data_stream import DataStream
+
 import my_code.dream_args as args
 from my_code.predict import model_runid
 
