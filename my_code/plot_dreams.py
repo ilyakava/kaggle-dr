@@ -134,7 +134,7 @@ def plot_dreams(model_file, test_path, max_itr, **kwargs):
             reshaped_batch = numpy.rollaxis(batch, 3, 1)
 
             column.x_buffer.set_value(lasagne.utils.floatX(batch), borrow=True)
-            batch_updates = self.dream_batch(0, layer_idx_of_interest)
+            batch_updates = self.dream_batch(0)
 
             batch += dream_updates
             itr += 1
