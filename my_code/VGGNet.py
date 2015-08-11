@@ -105,6 +105,7 @@ class VGGNet(object):
         )
 
         layer_idx_of_interest = 13
+        pdb.set_trace()
         my_input = X_batch
         l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True) ** 2)
         dream_updates = lasagne.updates.sgd(l2_activations, [my_input], learning_rate)
