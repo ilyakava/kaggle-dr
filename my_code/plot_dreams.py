@@ -88,7 +88,7 @@ class DreamStudyBuffer(object):
         self.source = self.data_stream.feed_image(image_name=test_imagepath, image_dir='')
 
     def update_source(self, batch_gradients, step_size=0.5):
-        image_gradients = numpy.rollaxis(bob, 1,4)
+        image_gradients = numpy.rollaxis(batch_gradients, 1,4)
         octave_images = [numpy.zeros(size, dtype=theano.config.floatX) for size in self.octave_sizes]
         octave_accs = [numpy.zeros(size, dtype=int) for size in self.octave_sizes]
         for i, tiles in enumerate(self.octave_tile_corners):
