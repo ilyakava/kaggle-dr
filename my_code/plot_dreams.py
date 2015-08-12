@@ -109,7 +109,6 @@ class DreamStudyBuffer(object):
         # Apply the enlarged gradient to the source
         # google_lambda = step_size / abs(source_size_gradient).mean()
         percent_lambda = (step_size*abs(self.source).max()) / abs(source_size_gradient).max()
-        pdb.set_trace()
         self.source += percent_lambda * source_size_gradient
         self.source = numpy.clip(self.source, 0.0, 255.0)
 
