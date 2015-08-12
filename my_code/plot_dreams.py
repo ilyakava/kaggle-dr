@@ -69,23 +69,23 @@ class DreamStudyBuffer(object):
     (source->batch, batch_output->source, and repeat)
     """
 
-    def __init__(self, source_size, nn_image_size):
+    def __init__(self, test_imagepath, nn_image_size):
         """
         :type source_size: Array of 2 integers
         :param source_size: [height, width] of image to have the dream
 
         :type nn_image_size: integer
         """
-        self.source_size = source_size
+        self.source = imread("%s.png" % test_imagepath)
+        self.source_size = self.source.shape[:2]
         self.nn_image_size = nn_image_size
 
         self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size)
         self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
         assert(self.batch_size <= 128)
 
-    def set_source(self, data_stream, test_imagepath):
+    def set_data_stream(self, data_streamh):
         self.data_stream = data_stream
-        self.source = self.data_stream.feed_image(image_name=test_imagepath, image_dir='')
 
     def update_source(self, batch_gradients, step_size=0.5):
         image_gradients = numpy.rollaxis(batch_gradients, 1,4)
@@ -128,7 +128,10 @@ class DreamStudyBuffer(object):
             for j, tile in enumerate(tiles):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
-                batch[idx] = octave_image[t:b,l:r,:]
+                crop = octave_image[t:b,l:r,:]
+                centered_crop = crop - self.data_stream.mean
+                standardized_crop = centered_crop / (self.data_stream.std + 1e-5)
+                batch[idx] = standardized_crop
                 idx += 1
 
         return numpy.rollaxis(batch, 3, 1)
@@ -184,13 +187,12 @@ def plot_dreams(model_file, test_imagepath, max_itr, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
-    source_size = imread("%s.png" % test_imagepath).shape[:2]
     nn_image_size = get_nn_image_size(model_file)
 
-    dsb = DreamStudyBuffer(source_size, nn_image_size)
+    dsb = DreamStudyBuffer(test_imagepath, nn_image_size)
 
     column = load_column(model_file, batch_size=dsb.batch_size, **kwargs)
-    dsb.set_source(column.ds, test_imagepath)
+    dsb.set_data_stream(column.ds, test_imagepath)
 
     try:
         itr = 0
