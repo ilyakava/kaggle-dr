@@ -4,28 +4,28 @@ import numpy
 from my_code.plot_dreams import calculate_octave_and_tile_sizes
 
 class CalculateOctaveAndTileSizes(unittest.TestCase):
-    def tile_within_image(self, octave_tile_corners, source_size, nn_image_size):
-        max_h, max_w = source_size
-        for octave_tiles in octave_tile_corners:
+    def tile_within_octave_image(self, octave_sizes, octave_tile_corners, source_size, nn_image_size):
+        for i, octave_tiles in enumerate(octave_tile_corners):
+            max_h, max_w = octave_sizes[i]
             for tile in octave_tiles:
                 t,l = tile
                 self.failUnless(t + nn_image_size <= max_h)
                 self.failUnless(l + nn_image_size <= max_w)
 
-    def full_image_coverage(self, octave_tile_corners, source_size, nn_image_size):
-        source = numpy.zeros(source_size)
-        max_h, max_w = source_size
-        for octave_tiles in octave_tile_corners:
+    def full_octave_image_coverage(self, octave_sizes, octave_tile_corners, source_size, nn_image_size):
+        for i, octave_tiles in enumerate(octave_tile_corners):
+            octave_image = numpy.zeros(octave_sizes[i])
             for tile in octave_tiles:
                 t,l = tile
                 b,r = [d+nn_image_size for d in tile]
-                source[t:b, l:r] += numpy.ones((nn_image_size,nn_image_size))
-        self.failUnless((source == 0).sum() == 0)
+                octave_image[t:b, l:r] += numpy.ones((nn_image_size,nn_image_size))
+            self.failUnless((octave_image == 0).sum() == 0)
 
     def _test(self,source_size,nn_image_size):
         octave_sizes, octave_tile_corners = calculate_octave_and_tile_sizes(source_size, nn_image_size)
-        self.tile_within_image(octave_tile_corners, source_size, nn_image_size)
-        self.full_image_coverage(octave_tile_corners, source_size, nn_image_size)
+        self.failUnless(octave_sizes[0] == list(source_size))
+        self.tile_within_octave_image(octave_sizes, octave_tile_corners, source_size, nn_image_size)
+        self.full_octave_image_coverage(octave_sizes, octave_tile_corners, source_size, nn_image_size)
 
     def testSimpleSquare(self):
         self._test(source_size=(11,11), nn_image_size=4)

@@ -20,10 +20,17 @@ import my_code.dream_args as args
 from my_code.predict import model_runid
 
 import scipy.misc
+from PIL import Image
 
 import pdb
 
 def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4):
+    """
+    :type source_size: Array of 2 integers
+    :param source_size: [height, width] of image to have the dream
+
+    :type nn_image_size: integer
+    """
     # find octave sizes
     # array of [h,w] arrays
     octave_sizes = [list(source_size)]
@@ -55,119 +62,71 @@ def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, o
         octave_tile_corners.append(tile_corners)
     return(octave_sizes,octave_tile_corners)
 
-# class DreamStudyBuffer(object):
-#     """
-#     Keeps the state of the dream in a double buffer
-#     (source->batch, batch_output->source, and repeat)
-#     """
+class DreamStudyBuffer(object):
+    """
+    Keeps the state of the dream in a double buffer
+    (source->batch, batch_output->source, and repeat)
+    """
 
-#     def __init__(self, data_stream, test_imagepath=None):
-#         OCTAVE_SCALE = 1.4
-#         MAX_OCTAVES = 4
-#         NN_IMG_SIZE = data_stream.image_shape[0]
+    def __init__(self, source_size, nn_image_size):
+        """
+        :type source_size: Array of 2 integers
+        :param source_size: [height, width] of image to have the dream
 
-#         # input image
-#         source = data_stream.feed_image(image_name=test_imagepath, image_dir='')
+        :type nn_image_size: integer
+        """
+        self.source_size = source_size
+        self.nn_image_size = nn_image_size
 
+        self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size)
+        self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
+        assert(self.batch_size <= 128)
 
+    def set_source(self, data_stream, test_imagepath):
+        self.data_stream = data_stream
+        self.source = self.data_stream.feed_image(image_name=test_imagepath, image_dir='')
 
-#         # resize source for octave images (another function) cur_octaves
-#         # with another function: initialize self.batch by tiling self.cur_octaves
+    def update_source(self, batch_gradients, step_size=0.5):
+        image_gradients = numpy.rollaxis(bob, 1,4)
+        octave_images = [numpy.zeros(size) for size in self.octave_sizes]
+        octave_accs = [numpy.zeros(size) for size in self.octave_sizes]
+        for i, tiles in enumerate(self.octave_tile_corners):
+            octave_image = octave_images[i]
+            octave_acc = octave_accs[i]
+            for j, tile in enumerate(tiles):
+                t,l = tile
+                b,r = [d+self.nn_image_size for d in tile]
+                # map back gradients to each octave with normalization constants
+                octave_image[t:b,l:r,:] = image_gradients[idx]
+                octave_acc[t:b,l:r,:] += 1
+                idx += 1
+        normalized_octave_images = octave_images / (len(self.octave_sizes)*octave_accs)
 
-#         # --- write to source
+        # enlarge each octave to original image size and update source image
+        cumulative_gradient = normalized_octave_images[:1]
+        for normalized_octave_image in normalized_octave_images[1:]:
+            img = scipy.misc.toimage(normalized_octave_image)
+            enlarged = img.resize(self.source_size, Image.ANTIALIAS)
+            cumulative_gradient += numpy.array(enlarged.getdata(), dtype=numpy.float32)
 
-#         # map back gradients to each octave and normalize
+        self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
 
-#         # enlarge each octave to original image size
+    def serve_batch(self):
+        source = self.source
+        # source = scipy.misc.toimage(source)
+        # skip resizing source
+        octave_images = [source] + [source.resize(new_size, Image.ANTIALIAS) for size in self.octave_sizes[1:]]
+        batch = numpy.zeros((self.batch_size,) + self.data_stream.image_shape)
+        idx = 0
+        for i, tiles in enumerate(self.octave_tile_corners):
+            octave_image = octave_images[i]
+            for j, tile in enumerate(tiles):
+                t,l = tile
+                b,r = [d+self.nn_image_size for d in tile]
+                batch[idx] = octave_image[t:b,l:r,:]
+                idx += 1
 
-#         # update source image
-
-#         # --- reset batch from new source
-
-#         # reset batch from new source image
-
-#         self.octave_images
-#         self.octave_tiles
-
-
-#         assert(occlusion_patch_size % 2 == 1) # for simplicity
-#         self.ds = data_stream
-#         self.occlusion_patch_size = occlusion_patch_size
-#         self.test_imagepath = test_imagepath
-
-#         patched_img_pad = (occlusion_patch_size - 1) / 2
-#         patched_img_dim = data_stream.image_shape[0] - patched_img_pad*2
-#         self.num_patch_centers = (patched_img_dim)**2 # number of images in test set
-
-#         self.patch_starts = [divmod(n, patched_img_dim) for n in xrange(self.num_patch_centers)]
-
-#     def nth_patch(self, n):
-#         i_start,j_start = self.patch_starts[n]
-#         i_end = i_start + self.occlusion_patch_size
-#         j_end = j_start + self.occlusion_patch_size
-
-#         return(i_start,i_end,j_start,j_end)
-
-#     def buffer_occluded_dataset(self):
-#         assert(self.test_imagepath)
-#         img = self.ds.feed_image(image_name=self.test_imagepath, image_dir='')
-#         channel_means = img.mean(axis=(0,1))
-
-#         x_cache_block = numpy.zeros(((self.ds.cache_size,) + self.ds.image_shape), dtype=theano.config.floatX)
-#         n_full_cache_blocks, n_leftovers = divmod(self.num_patch_centers, self.ds.cache_size)
-#         for ith_cache_block in xrange(n_full_cache_blocks):
-#             ith_cache_block_end = (ith_cache_block + 1) * self.ds.cache_size
-#             idxs_to_full_dataset = list(range(ith_cache_block * self.ds.cache_size, ith_cache_block_end))
-#             for ci,n in enumerate(idxs_to_full_dataset):
-#                 i_start,i_end,j_start,j_end = self.nth_patch(n)
-
-#                 x_cache_block[ci, ...] = img
-#                 x_cache_block[ci, i_start:i_end, j_start:j_end, :] = channel_means
-#             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
-#         # sneak the leftovers out, padded by the previous full cache block
-#         if n_leftovers:
-#             for ci, n in enumerate(list(xrange(ith_cache_block_end, len(self.patch_starts)))):
-#                 i_start,i_end,j_start,j_end = self.nth_patch(n)
-
-#                 x_cache_block[ci, ...] = img
-#                 x_cache_block[ci, i_start:i_end, j_start:j_end, :] = channel_means
-#                 idxs_to_full_dataset[ci] = n
-#             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
-
-#     def accumulate_patches_into_heatmaps(self, all_test_output, outpath_prefix=''):
-#         outpath = "plots/%s_%s.png" % (outpath_prefix, path.splitext(path.basename(self.test_imagepath))[0])
-#         # http://matplotlib.org/examples/axes_grid/demo_axes_grid.html
-#         fig = plt.figure()
-#         grid = AxesGrid(fig, 143, # similar to subplot(143)
-#                     nrows_ncols = (1, 1))
-#         orig_img = imread(self.test_imagepath+'.png')
-#         grid[0].imshow(orig_img)
-#         grid = AxesGrid(fig, 144, # similar to subplot(144)
-#                     nrows_ncols = (2, 2),
-#                     axes_pad = 0.15,
-#                     label_mode = "1",
-#                     share_all = True,
-#                     cbar_location="right",
-#                     cbar_mode="each",
-#                     cbar_size="7%",
-#                     cbar_pad="2%",
-#                     )
-
-#         for klass in xrange(all_test_output.shape[1]):
-#             accumulator = numpy.zeros(self.ds.image_shape[:2])
-#             normalizer = numpy.zeros(self.ds.image_shape[:2])
-#             for n in xrange(self.num_patch_centers):
-#                 i_start,i_end,j_start,j_end = self.nth_patch(n)
-
-#                 accumulator[i_start:i_end, j_start:j_end] += all_test_output[n,klass]
-#                 normalizer[i_start:i_end, j_start:j_end] += 1
-#             normalized_img = accumulator / normalizer
-#             im = grid[klass].imshow(normalized_img, interpolation="nearest", vmin=0, vmax=1)
-#             grid.cbar_axes[klass].colorbar(im)
-#         grid.axes_llc.set_xticks([])
-#         grid.axes_llc.set_yticks([])
-#         print("Saving figure as: %s" % outpath)
-#         plt.savefig(outpath, dpi=600, bbox_inches='tight')
+        return numpy.rollaxis(batch, 3, 1)
 
 # Layers to choose:
 
@@ -198,41 +157,48 @@ def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, o
 # 25: DropoutLayer
 # 26: DenseLayer
 
-def load_column(model_file, batch_size, learning_rate, train_dataset, train_labels_csv_path, center, normalize, train_flip,
+def get_nn_image_size(model_file):
+    f = open(model_file)
+    _batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
+    f.close()
+    return image_shape[0]
+
+def load_column(model_file, batch_size, train_dataset, train_labels_csv_path, center, normalize, train_flip,
                 test_dataset, random_seed, valid_dataset_size, filter_shape, cuda_convnet):
     print("Loading Model...")
     f = open(model_file)
-    _batch_size, _init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
+    _batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape = cPickle.load(f)
+    data_stream = DataStream(train_image_dir=train_dataset, train_labels_csv_path=train_labels_csv_path, image_shape=image_shape, batch_size=batch_size, cache_size_factor=1, center=center, normalize=normalize, train_flip=train_flip, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
     f.close()
 
-    data_stream = DataStream(train_image_dir=train_dataset, train_labels_csv_path=train_labels_csv_path, image_shape=image_shape, batch_size=batch_size, cache_size_factor=1, center=center, normalize=normalize, train_flip=train_flip, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
-    column = VGGNet(data_stream, batch_size, learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet)
+    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet)
     column.restore(model_file)
     return column
 
-def plot_dreams(model_file, test_path, max_itr, **kwargs):
+def plot_dreams(model_file, test_imagepath, max_itr, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
-    column = load_column(model_file, batch_size=1, learning_rate=1, **kwargs)
+    source_size = imread(test_imagepath).shape[:2]
+    nn_image_size = get_nn_image_size(model_file)
+
+    dsb = DreamStudyBuffer(source_size, nn_image_size)
+
+    column = load_column(model_file, batch_size=dsb.batch_size, **kwargs)
+    dsb.set_source(column.ds, test_imagepath)
 
     try:
         itr = 0
-        batch = numpy.zeros((1,) + column.ds.image_shape)
-        batch[0] = column.ds.feed_image(image_name=test_path, image_dir='')
-        reshaped_batch = numpy.rollaxis(batch, 3, 1)
-        column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
-
         while itr <= max_itr:
+            column.x_buffer.set_value(lasagne.utils.floatX(dsb.serve_batch()), borrow=True)
+
             if (itr in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_itr),10)])):
                 name = 'data/dreams/%i_itr.png' % itr
                 print("saving %s" % name)
-                scipy.misc.toimage(numpy.rollaxis(reshaped_batch[0], 0, 3)).save(name, "PNG")
+                scipy.misc.toimage(dsb.source).save(name, "PNG")
 
-            step_size = 0.5 # the biggest change in the image will be this percent increase/decrease
             batch_updates = column.dream_batch(1)
-            reshaped_batch += ((step_size*numpy.abs(reshaped_batch).max())/numpy.abs(batch_updates).max()) * batch_updates
-            column.x_buffer.set_value(lasagne.utils.floatX(reshaped_batch), borrow=True)
+            dsb.update_source(batch_updates)
 
             itr += 1
 
