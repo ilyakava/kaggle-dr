@@ -132,7 +132,7 @@ class DreamStudyBuffer(object):
                 if not self.data_stream.mean == None:
                     crop = crop - self.data_stream.mean
                 if not self.data_stream.std == None:
-                    crop = centered_crop / (self.data_stream.std + 1e-5)
+                    crop = crop / (self.data_stream.std + 1e-5)
                 batch[idx] = crop
                 idx += 1
 
