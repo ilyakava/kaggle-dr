@@ -89,6 +89,7 @@ class DreamStudyBuffer(object):
         self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size,
                                                                                       max_octaves=max_octaves, octave_scale=octave_scale)
         self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
+        print("Dreaming with batch size: %i" % self.batch_size)
         assert(self.batch_size <= 128)
 
     def update_source(self, batch_gradients, step_size=0.5):
@@ -109,8 +110,8 @@ class DreamStudyBuffer(object):
                 gradient_for_img = (std_image_gradient * (step_size*batch_images[idx].std())) + batch_images[idx].mean()
 
                 # mean_lambda = (step_size*abs(batch_images[idx]).mean()) / abs(batch_gradients[idx]).mean()
-                # google_lambda = (step_size) / abs(batch_gradients[idx]).mean()
-                new_image = batch_images[idx] + gradient_for_img
+                google_lambda = step_size / abs(batch_gradients[idx]).mean()
+                new_image = batch_images[idx] + (google_lambda * batch_images[idx])
                 octave_image[t:b,l:r,:] += new_image
 
                 octave_acc[t:b,l:r,:] += 1
