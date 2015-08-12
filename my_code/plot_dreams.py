@@ -26,7 +26,7 @@ from PIL import Image
 
 import pdb
 
-def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4):
+def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0.15):
     """
     :type source_size: Array of 2 integers
     :param source_size: [height, width] of image to have the dream
@@ -48,14 +48,18 @@ def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, o
     octave_tile_corners = []
     for size in octave_sizes:
         h,w = size
+        max_h = (h-nn_image_size); max_w = (w-nn_image_size);
+        stride = int(nn_image_size - overlap_percentage*nn_image_size)
 
-        n_minus1_tiles_h, nth_tile_offset_h = divmod(h, nn_image_size)
-        tops = [nn_image_size * i for i in range(n_minus1_tiles_h)]
-        tops.append(tops[-1]+nth_tile_offset_h)
+        tops = [0]
+        while tops[-1] < max_h:
+            tops.append(tops[-1]+stride)
+        tops[-1] = max_h
 
-        n_minus1_tiles_w, nth_tile_offset_w = divmod(w, nn_image_size)
-        lefts = [nn_image_size * i for i in range(n_minus1_tiles_w)]
-        lefts.append(lefts[-1]+nth_tile_offset_w)
+        lefts = [0]
+        while lefts[-1] < max_w:
+            lefts.append(lefts[-1]+stride)
+        lefts[-1] = max_w
 
         tile_corners = []
         for top in tops:
