@@ -118,6 +118,7 @@ class DreamStudyBuffer(object):
         octave_images = [self.source]
         for new_size in self.octave_sizes[1:]:
             shrunken = source_img.resize(new_size, Image.ANTIALIAS)
+            pdb.set_trace()
             octave_images.append(lasagne.utils.floatX(shrunken.getdata()).reshape([new_size] + [3]))
 
         batch = numpy.zeros((self.batch_size,) + self.data_stream.image_shape, dtype=theano.config.floatX)
