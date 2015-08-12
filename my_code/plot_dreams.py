@@ -26,7 +26,7 @@ from PIL import Image
 
 import pdb
 
-def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0.15):
+def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0.25):
     """
     :type source_size: Array of 2 integers
     :param source_size: [height, width] of image to have the dream
