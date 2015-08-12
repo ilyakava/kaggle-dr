@@ -79,7 +79,7 @@ class DreamStudyBuffer(object):
         :type nn_image_size: integer
         """
         self.source = imread("%s.png" % test_imagepath)
-        self.source_size = self.source.shape[:2]
+        self.source_size = numpy.array(self.source.shape[:2])
         self.nn_image_size = nn_image_size
 
         self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size)
@@ -111,7 +111,8 @@ class DreamStudyBuffer(object):
         # enlarge each octave to original image size and update source image
         cumulative_image = normalized_octave_images[0]
         for normalized_octave_image in normalized_octave_images[1:]:
-            enlarged = nd.zoom(normalized_octave_image, self.source_size + [3], order=1)
+            new_zoom = (self.source_size / numpy.array(normalized_octave_image.shape[:2])).tolist() + [1]
+            enlarged = nd.zoom(normalized_octave_image, new_zoom, order=1)
             cumulative_image += enlarged
 
         self.source = cumulative_image
@@ -120,8 +121,8 @@ class DreamStudyBuffer(object):
         # skip resizing source
         octave_images = [self.source]
         for new_size in self.octave_sizes[1:]:
-            pdb.set_trace()
-            shrunken = nd.zoom(self.source, new_size + [3], order=1)
+            new_zoom = (numpy.array(new_size, dtype=float) / self.source_size).tolist() + [1]
+            shrunken = nd.zoom(self.source, new_zoom, order=1)
             octave_images.append(shrunken)
 
         batch = numpy.zeros((self.batch_size,self.nn_image_size,self.nn_image_size,3), dtype=theano.config.floatX)
