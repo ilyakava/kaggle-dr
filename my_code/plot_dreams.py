@@ -128,6 +128,8 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
                 print("i,j %i,%i" % (i,j))
+                if i == 1:
+                    pdb.set_trace()
                 batch[idx] = octave_image[t:b,l:r,:]
                 idx += 1
 
