@@ -188,7 +188,6 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size, max_octav
     # precalc octaves and tiles, as well as max batch size
     dsb = DreamStudyBuffer(test_imagepath, nn_image_size, max_octaves, octave_scale)
     max_nn_pass = len(dsb.octave_sizes) * itr_per_octave
-    pdb.set_trace()
 
     column = load_column(model_file, batch_size=dsb.max_batch_size, **kwargs)
 
@@ -203,11 +202,12 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size, max_octav
 
                 dsb.update_source( batch_updates, octave, step_size )
 
+                nn_pass += 1
                 if (nn_pass in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_nn_pass),10)])):
                     name = 'data/dreams/%i_nnpass_%i_itr_%i_octave.png' % (nn_pass, itr, octave)
                     print("saving %s" % name)
                     scipy.misc.toimage(dsb.source).save(name, "PNG")
-                nn_pass += 1
+
     except KeyboardInterrupt:
         print "[ERROR] User terminated Dream Study"
     print "Done"
