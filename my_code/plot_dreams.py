@@ -71,7 +71,7 @@ class DreamStudyBuffer(object):
     (source->batch, batch_output->source, and repeat)
     """
 
-    def __init__(self, test_imagepath, nn_image_size):
+    def __init__(self, test_imagepath, nn_image_size, max_octaves, octave_scale):
         """
         :type source_size: Array of 2 integers
         :param source_size: [height, width] of image to have the dream
@@ -82,7 +82,8 @@ class DreamStudyBuffer(object):
         self.source_size = numpy.array(self.source.shape[:2])
         self.nn_image_size = nn_image_size
 
-        self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size)
+        self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size,
+                                                                                      max_octaves=max_octaves, octave_scale=octave_scale)
         self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
         assert(self.batch_size <= 128)
 
@@ -193,13 +194,13 @@ def load_column(model_file, batch_size, train_dataset, train_labels_csv_path, ce
     column.restore(model_file)
     return column
 
-def plot_dreams(model_file, test_imagepath, max_itr, step_size, **kwargs):
+def plot_dreams(model_file, test_imagepath, max_itr, step_size, max_octaves, octave_scale, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
     nn_image_size = get_nn_image_size(model_file)
 
-    dsb = DreamStudyBuffer(test_imagepath, nn_image_size)
+    dsb = DreamStudyBuffer(test_imagepath, nn_image_size, max_octaves, octave_scale)
 
     column = load_column(model_file, batch_size=dsb.batch_size, **kwargs)
 
@@ -230,6 +231,8 @@ if __name__ == '__main__':
            test_imagepath=_.test_imagepath,
            max_itr=_.max_itr,
            step_size=_.step_size,
+           max_octaves=_.max_octaves,
+           octave_scale=_.octave_scale,
            train_dataset=_.train_dataset,
            train_labels_csv_path=_.train_labels_csv_path,
            center=_.center,

@@ -70,5 +70,13 @@ def get():
                         "--step-size",
                         type=float,
                         default=0.5)
+    parser.add_argument("-o",
+                        "--max-octaves",
+                        type=int,
+                        default=4)
+    parser.add_argument("-S",
+                        "--octave-scale",
+                        type=float,
+                        default=1.4)
 
     return parser.parse_args()
