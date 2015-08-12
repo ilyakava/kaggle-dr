@@ -75,8 +75,7 @@ class DreamStudyBuffer(object):
 
         :type nn_image_size: integer
         """
-        self.source = imread("%s.png" % test_imagepath)
-        pdb.set_trace()
+        self.source = lasagne.utils.floatX(imread("%s.png" % test_imagepath))
         self.source_size = numpy.array(self.source.shape[:2])
         self.nn_image_size = nn_image_size
 
@@ -209,7 +208,7 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size, max_octav
                 if (nn_pass in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_nn_pass),10)])):
                     name = 'data/dreams/%i_nnpass_%i_itr_%i_octave.png' % (nn_pass, itr, octave)
                     print("saving %s" % name)
-                    scipy.misc.toimage(dsb.source).save(name, "PNG")
+                    scipy.misc.toimage(numpy.uint8(dsb.source)).save(name, "PNG")
 
     except KeyboardInterrupt:
         print "[ERROR] User terminated Dream Study"
