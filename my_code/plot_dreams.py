@@ -111,7 +111,7 @@ class DreamStudyBuffer(object):
         # google_lambda = step_size / abs(source_size_gradient).mean()
         percent_lambda = (step_size*abs(self.source).max()) / abs(source_size_gradient).max()
         self.source += percent_lambda * source_size_gradient
-        # self.source = (self.source / self.source.mean()) * old_mean
+        self.source = (self.source / self.source.mean()) * old_mean
         self.source = numpy.clip(self.source, 0.0, 255.0)
 
     def tile_source_into_batch(self, octave, mean=None, std=None):
