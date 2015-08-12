@@ -84,7 +84,7 @@ class DreamStudyBuffer(object):
         self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
         assert(self.batch_size <= 128)
 
-    def set_data_stream(self, data_streamh):
+    def set_data_stream(self, data_stream):
         self.data_stream = data_stream
 
     def update_source(self, batch_gradients, step_size=0.5):
@@ -129,9 +129,11 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
                 crop = octave_image[t:b,l:r,:]
-                centered_crop = crop - self.data_stream.mean
-                standardized_crop = centered_crop / (self.data_stream.std + 1e-5)
-                batch[idx] = standardized_crop
+                if self.data_stream.mean:
+                    crop = crop - self.data_stream.mean
+                if self.data_stream.std:
+                    crop = centered_crop / (self.data_stream.std + 1e-5)
+                batch[idx] = crop
                 idx += 1
 
         return numpy.rollaxis(batch, 3, 1)
