@@ -20,6 +20,7 @@ import my_code.dream_args as args
 from my_code.predict import model_runid
 
 import scipy.misc
+from skimage.io import imread
 from PIL import Image
 
 import pdb
