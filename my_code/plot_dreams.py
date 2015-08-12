@@ -137,6 +137,26 @@ class DreamStudyBuffer(object):
         self.previous_batch = batch
         return numpy.rollaxis(self.previous_batch, 3, 1)
 
+class DreamNet(VGGNet):
+    def __init__(self, data_stream, batch_size, init_learning_rate, momentum,
+                 leak_alpha, model_spec, loss_type, num_output_classes, pad,
+                 image_shape, filter_shape, cuda_convnet=1, runid=None):
+        super(VGGNet, self).__init__(data_stream, batch_size, init_learning_rate, momentum,
+                                     leak_alpha, model_spec, loss_type, num_output_classes, pad,
+                                     image_shape, filter_shape, cuda_convnet=1, runid=None)
+
+        layer_idx_of_interest = 10
+        my_input = X_batch
+        l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True) ** 2)
+        dream_updates = lasagne.updates.sgd(l2_activations, [my_input], learning_rate)
+        self.dream_batch = theano.function(
+            [learning_rate],
+            dream_updates.values()[0],
+            givens={
+                X_batch: self.x_buffer
+            }
+        )
+
 # Layers to choose:
 
 # 1: ShuffleBC01ToC01BLayer
@@ -180,7 +200,7 @@ def load_column(model_file, batch_size, train_dataset, train_labels_csv_path, ce
     data_stream = DataStream(train_image_dir=train_dataset, train_labels_csv_path=train_labels_csv_path, image_shape=image_shape, batch_size=batch_size, cache_size_factor=1, center=center, normalize=normalize, train_flip=train_flip, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
     f.close()
 
-    column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet)
+    column = DreamNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet)
     column.restore(model_file)
     return column
 
