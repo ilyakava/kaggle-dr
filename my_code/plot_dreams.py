@@ -225,7 +225,7 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size, max_octav
                 next_batch = dsb.tile_source_into_batch( octave, column.ds.mean, column.ds.std )
                 column.x_buffer.set_value(lasagne.utils.floatX(next_batch), borrow=True)
 
-                batch_updates = column.dream_batch(1)
+                batch_updates = column.dream_batch()
 
                 dsb.update_source( batch_updates, octave, step_size )
 
