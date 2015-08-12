@@ -32,7 +32,7 @@ def get():
                         default='no_flip',
                         help="Method name or csv file that contains complete information on whether to flip a given training image.")
     parser.add_argument("-D",
-                        "--test-path",
+                        "--test-imagepath",
                         type=str,
                         default=None,
                         help="Either a path to an image file (with extension) or directory of images.")

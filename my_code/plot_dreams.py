@@ -210,7 +210,7 @@ if __name__ == '__main__':
     _ = args.get()
 
     plot_dreams(model_file=_.model_file,
-           test_path=_.test_path,
+           test_imagepath=_.test_imagepath,
            max_itr=_.max_itr,
            train_dataset=_.train_dataset,
            train_labels_csv_path=_.train_labels_csv_path,
