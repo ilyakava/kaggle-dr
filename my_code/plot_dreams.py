@@ -110,7 +110,7 @@ class DreamStudyBuffer(object):
 
                 # mean_lambda = (step_size*abs(batch_images[idx]).mean()) / abs(batch_gradients[idx]).mean()
                 # google_lambda = (step_size) / abs(batch_gradients[idx]).mean()
-                new_image = std_image + gradient_for_img
+                new_image = batch_images[idx] + gradient_for_img
                 octave_image[t:b,l:r,:] += new_image
 
                 octave_acc[t:b,l:r,:] += 1
