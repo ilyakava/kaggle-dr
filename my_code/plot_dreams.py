@@ -75,7 +75,7 @@ class DreamStudyBuffer(object):
 
         :type nn_image_size: integer
         """
-        self.source = imread("%s.png" % test_imagepath)
+        self.source = lasagne.utils.floatX(imread("%s.png" % test_imagepath))
         self.source_size = numpy.array(self.source.shape[:2])
         self.nn_image_size = nn_image_size
 
@@ -109,7 +109,9 @@ class DreamStudyBuffer(object):
         # Apply the enlarged gradient to the source
         # google_lambda = step_size / abs(source_size_gradient).mean()
         percent_lambda = (step_size*abs(self.source).max()) / abs(source_size_gradient).max()
+        pdb.set_trace()
         self.source += percent_lambda * source_size_gradient
+        self.source = numpy.clip(self.source, 0.0, 255.0)
 
     def tile_source_into_batch(self, octave, mean=None, std=None):
         octave_size = self.octave_sizes[octave]
