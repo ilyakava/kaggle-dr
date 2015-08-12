@@ -188,6 +188,7 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size, max_octav
     # precalc octaves and tiles, as well as max batch size
     dsb = DreamStudyBuffer(test_imagepath, nn_image_size, max_octaves, octave_scale)
     max_nn_pass = len(dsb.octave_sizes) * itr_per_octave
+    pdb.set_trace()
 
     column = load_column(model_file, batch_size=dsb.max_batch_size, **kwargs)
 
