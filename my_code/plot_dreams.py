@@ -75,7 +75,7 @@ class DreamStudyBuffer(object):
 
         :type nn_image_size: integer
         """
-        self.source = lasagne.utils.floatX(imread("%s.png" % test_imagepath))
+        self.source = imread("%s.png" % test_imagepath)
         self.source_size = numpy.array(self.source.shape[:2])
         self.nn_image_size = nn_image_size
 
