@@ -89,7 +89,9 @@ class DreamStudyBuffer(object):
         self.data_stream = data_stream
 
     def update_source(self, batch_gradients, step_size=0.5):
-        image_gradients = numpy.rollaxis(batch_gradients, 1,4)
+        batch_gradients = numpy.rollaxis(batch_gradients, 1,4)
+        batch_images = numpy.rollaxis(self.previous_batch, 1,4)
+
         octave_images = [numpy.zeros(size + [3], dtype=theano.config.floatX) for size in self.octave_sizes]
         octave_accs = [numpy.zeros(size + [3], dtype=int) for size in self.octave_sizes]
         idx = 0
@@ -99,19 +101,23 @@ class DreamStudyBuffer(object):
             for j, tile in enumerate(tiles):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
-                # map back gradients to each octave with normalization constants
-                octave_image[t:b,l:r,:] += image_gradients[idx]
+
+                lambda_ = (step_size*abs(batch_gradients[idx]).max()) / abs(batch_images[idx]).max()
+                new_image = batch_images[idx] + (lambda_ * batch_gradients[idx])
+                octave_image[t:b,l:r,:] += new_image
+
                 octave_acc[t:b,l:r,:] += 1
                 idx += 1
+        # now average together the pixels in the many images
         normalized_octave_images = [octave_images[i] / (len(self.octave_sizes)*octave_accs[i]) for i in range(len(octave_images))]
         # enlarge each octave to original image size and update source image
-        cumulative_gradient = normalized_octave_images[0]
+        cumulative_image = normalized_octave_images[0]
         for normalized_octave_image in normalized_octave_images[1:]:
             img = scipy.misc.toimage(normalized_octave_image)
             enlarged = img.resize(self.source_size, Image.ANTIALIAS)
-            cumulative_gradient += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + (3,))
+            cumulative_image += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + (3,))
 
-        self.source += ((numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
+        self.source = cumulative_image
 
     def serve_batch(self):
         source_img = scipy.misc.toimage(self.source)
@@ -136,7 +142,8 @@ class DreamStudyBuffer(object):
                 batch[idx] = crop
                 idx += 1
 
-        return numpy.rollaxis(batch, 3, 1)
+        self.previous_batch = numpy.rollaxis(batch, 3, 1)
+        return self.previous_batch
 
 # Layers to choose:
 
