@@ -4,6 +4,7 @@ import numpy
 import cPickle
 
 import theano
+import theano.tensor as T
 import lasagne
 
 from my_code.VGGNet import VGGNet
