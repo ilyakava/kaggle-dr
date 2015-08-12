@@ -123,6 +123,7 @@ class DreamStudyBuffer(object):
         for new_size in self.octave_sizes[1:]:
             new_zoom = (numpy.array(new_size, dtype=float) / self.source_size).tolist() + [1]
             shrunken = nd.zoom(self.source, new_zoom, order=1)
+            assert(list(shrunken.shape[:2]) == new_size)
             octave_images.append(shrunken)
 
         batch = numpy.zeros((self.batch_size,self.nn_image_size,self.nn_image_size,3), dtype=theano.config.floatX)
