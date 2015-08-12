@@ -180,7 +180,7 @@ def plot_dreams(model_file, test_imagepath, max_itr, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
-    source_size = imread(test_imagepath).shape[:2]
+    source_size = imread("%s.png" % test_imagepath).shape[:2]
     nn_image_size = get_nn_image_size(model_file)
 
     dsb = DreamStudyBuffer(source_size, nn_image_size)
