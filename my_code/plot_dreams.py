@@ -99,11 +99,10 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
                 # map back gradients to each octave with normalization constants
-                octave_image[t:b,l:r,:] = image_gradients[idx]
+                octave_image[t:b,l:r,:] += image_gradients[idx]
                 octave_acc[t:b,l:r,:] += 1
                 idx += 1
         normalized_octave_images = [octave_images[i] / (len(self.octave_sizes)*octave_accs[i]) for i in range(len(octave_images))]
-        pdb.set_trace()
         # enlarge each octave to original image size and update source image
         cumulative_gradient = normalized_octave_images[0]
         for normalized_octave_image in normalized_octave_images[1:]:
