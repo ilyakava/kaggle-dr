@@ -129,9 +129,9 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
                 crop = octave_image[t:b,l:r,:]
-                if self.data_stream.mean:
+                if not self.data_stream.mean == None:
                     crop = crop - self.data_stream.mean
-                if self.data_stream.std:
+                if not self.data_stream.std == None:
                     crop = centered_crop / (self.data_stream.std + 1e-5)
                 batch[idx] = crop
                 idx += 1
