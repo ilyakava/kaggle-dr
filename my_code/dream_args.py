@@ -78,5 +78,9 @@ def get():
                         "--octave-scale",
                         type=float,
                         default=1.4)
+    parser.add_argument("-l",
+                        "--layer-idx-of-interest",
+                        type=int,
+                        default=10)
 
     return parser.parse_args()
