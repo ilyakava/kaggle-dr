@@ -110,6 +110,7 @@ class DreamStudyBuffer(object):
             enlarged = img.resize(self.source_size, Image.ANTIALIAS)
             cumulative_gradient += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + (3,))
 
+        pdb.set_trace()
         self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
 
     def serve_batch(self):
