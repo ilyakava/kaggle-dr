@@ -141,7 +141,7 @@ class DreamNet(VGGNet):
     def __init__(self, data_stream, batch_size, init_learning_rate, momentum,
                  leak_alpha, model_spec, loss_type, num_output_classes, pad,
                  image_shape, filter_shape, cuda_convnet=1, runid=None):
-        super(VGGNet, self).__init__(data_stream, batch_size, init_learning_rate, momentum,
+        super(DreamNet, self).__init__(data_stream, batch_size, init_learning_rate, momentum,
                                      leak_alpha, model_spec, loss_type, num_output_classes, pad,
                                      image_shape, filter_shape, cuda_convnet=1, runid=None)
 
