@@ -124,7 +124,7 @@ class DreamStudyBuffer(object):
             shrunken = source_img.resize(new_size, Image.ANTIALIAS)
             octave_images.append(lasagne.utils.floatX(shrunken.getdata()).reshape(new_size + [3]))
 
-        batch = numpy.zeros((self.batch_size,) + self.data_stream.image_shape, dtype=theano.config.floatX)
+        batch = numpy.zeros((self.batch_size,self.nn_image_size,self.nn_image_size,3), dtype=theano.config.floatX)
         idx = 0
         for i, tiles in enumerate(self.octave_tile_corners):
             octave_image = octave_images[i]
