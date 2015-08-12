@@ -103,7 +103,7 @@ class DreamStudyBuffer(object):
         normalized_untiled_gradient = untiled_gradient / untiled_gradient_normalizer
 
         # Then enlarge the gradient to source size
-        zoom_in = (self.source_size / numpy.array(nself.octave_sizes[octave], dtype=float)).tolist() + [1]
+        zoom_in = (self.source_size / numpy.array(self.octave_sizes[octave], dtype=float)).tolist() + [1]
         source_size_gradient = nd.zoom(normalized_untiled_gradient, zoom_in, order=1)
         assert(list(source_size_gradient.shape[:2]) == self.source_size.tolist())
         # Apply the enlarged gradient to the source
