@@ -107,9 +107,9 @@ class DreamStudyBuffer(object):
         source_size_gradient = nd.zoom(normalized_untiled_gradient, zoom_in, order=1)
         assert(list(source_size_gradient.shape[:2]) == self.source_size.tolist())
         # Apply the enlarged gradient to the source
-        # google_lambda = step_size / abs(source_size_gradient).mean()
-        percent_lambda = (step_size*abs(self.source).max()) / abs(source_size_gradient).max()
-        self.source += percent_lambda * source_size_gradient
+        google_lambda = step_size / abs(source_size_gradient).mean()
+        # percent_lambda = (step_size*abs(self.source).max()) / abs(source_size_gradient).max()
+        self.source += google_lambda * source_size_gradient
         self.source = numpy.clip(self.source, 0.0, 255.0)
 
     def tile_source_into_batch(self, octave, mean=None, std=None):
