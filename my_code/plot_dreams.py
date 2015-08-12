@@ -109,6 +109,7 @@ class DreamStudyBuffer(object):
         for normalized_octave_image in normalized_octave_images[1:]:
             img = scipy.misc.toimage(normalized_octave_image)
             enlarged = img.resize(self.source_size, Image.ANTIALIAS)
+            pdb.set_trace()
             cumulative_gradient += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + [3])
 
         self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
