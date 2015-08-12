@@ -76,6 +76,7 @@ class DreamStudyBuffer(object):
         :type nn_image_size: integer
         """
         self.source = imread("%s.png" % test_imagepath)
+        pdb.set_trace()
         self.source_size = numpy.array(self.source.shape[:2])
         self.nn_image_size = nn_image_size
 
