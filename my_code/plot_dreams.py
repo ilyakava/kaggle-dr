@@ -100,7 +100,7 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
 
-                lambda_ = (step_size*abs(batch_gradients[idx]).max()) / abs(batch_images[idx]).max()
+                lambda_ = (step_size*abs(batch_images[idx]).max()) / abs(batch_gradients[idx]).max()
                 new_image = batch_images[idx] + (lambda_ * batch_gradients[idx])
                 octave_image[t:b,l:r,:] += new_image
 
