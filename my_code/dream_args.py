@@ -81,6 +81,7 @@ def get():
     parser.add_argument("-l",
                         "--layer-idx-of-interest",
                         type=int,
-                        default=10)
+                        default=10,
+                        help="For vgg_mini7b_leak_sig_ecp, CONV layers are: [2,5,8,10,13,16]")
 
     return parser.parse_args()

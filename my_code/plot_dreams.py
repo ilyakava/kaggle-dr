@@ -85,7 +85,7 @@ class DreamStudyBuffer(object):
         self.batch_sizes = [len(tiles) for tiles in self.octave_tile_corners]
         # batch size will need to be kept constant (1 octave = 1 batch, processed n_itr times)
         self.max_batch_size = max(self.batch_sizes)
-        print("Dreaming with batch size: %i" % self.max_batch_size)
+        print("[INFO]: Dreaming with batch size: %i" % self.max_batch_size)
         assert(self.max_batch_size <= 128)
 
     def update_source(self, batch_gradients, octave, step_size):
