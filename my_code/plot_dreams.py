@@ -89,8 +89,8 @@ class DreamStudyBuffer(object):
 
     def update_source(self, batch_gradients, step_size=0.5):
         image_gradients = numpy.rollaxis(bob, 1,4)
-        octave_images = [numpy.zeros(size) for size in self.octave_sizes]
-        octave_accs = [numpy.zeros(size) for size in self.octave_sizes]
+        octave_images = [numpy.zeros(size, dtype=theano.config.floatX) for size in self.octave_sizes]
+        octave_accs = [numpy.zeros(size, dtype=int) for size in self.octave_sizes]
         for i, tiles in enumerate(self.octave_tile_corners):
             octave_image = octave_images[i]
             octave_acc = octave_accs[i]
@@ -108,16 +108,19 @@ class DreamStudyBuffer(object):
         for normalized_octave_image in normalized_octave_images[1:]:
             img = scipy.misc.toimage(normalized_octave_image)
             enlarged = img.resize(self.source_size, Image.ANTIALIAS)
-            cumulative_gradient += numpy.array(enlarged.getdata(), dtype=numpy.float32)
+            cumulative_gradient += lasagne.utils.floatX(enlarged.getdata())
 
         self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
 
     def serve_batch(self):
-        source = self.source
-        # source = scipy.misc.toimage(source)
+        source_img = scipy.misc.toimage(source)
         # skip resizing source
-        octave_images = [source] + [source.resize(new_size, Image.ANTIALIAS) for size in self.octave_sizes[1:]]
-        batch = numpy.zeros((self.batch_size,) + self.data_stream.image_shape)
+        octave_images = [self.source]
+        for new_size in self.octave_sizes[1:]:
+            shrunken = source_img.resize(new_size, Image.ANTIALIAS)
+            octave_images.append(lasagne.utils.floatX(shrunken.getdata()))
+
+        batch = numpy.zeros((self.batch_size,) + self.data_stream.image_shape, dtype=theano.config.floatX)
         idx = 0
         for i, tiles in enumerate(self.octave_tile_corners):
             octave_image = octave_images[i]
