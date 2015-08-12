@@ -59,7 +59,8 @@ def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, o
         tile_corners = []
         for top in tops:
             for left in lefts:
-                tile_corners.append([top,left])
+                if not [top,left] in tile_corners:
+                    tile_corners.append([top,left])
         octave_tile_corners.append(tile_corners)
     return(octave_sizes,octave_tile_corners)
 
@@ -110,8 +111,7 @@ class DreamStudyBuffer(object):
             enlarged = img.resize(self.source_size, Image.ANTIALIAS)
             cumulative_gradient += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + (3,))
 
-        pdb.set_trace()
-        self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
+        self.source += ((numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
 
     def serve_batch(self):
         source_img = scipy.misc.toimage(self.source)
