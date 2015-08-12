@@ -112,6 +112,7 @@ class DreamStudyBuffer(object):
 
     def tile_source_into_batch(self, octave, mean=None, std=None):
         octave_size = self.octave_sizes[octave]
+        tiles = self.octave_tile_corners[octave]
         zoom_out = (numpy.array(octave_size, dtype=float) / self.source_size).tolist() + [1]
         # shrink source image
         octave_image = nd.zoom(self.source, zoom_out, order=1)
