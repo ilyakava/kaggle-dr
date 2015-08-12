@@ -108,7 +108,7 @@ class DreamStudyBuffer(object):
         for normalized_octave_image in normalized_octave_images[1:]:
             img = scipy.misc.toimage(normalized_octave_image)
             enlarged = img.resize(self.source_size, Image.ANTIALIAS)
-            cumulative_gradient += lasagne.utils.floatX(enlarged.getdata())
+            cumulative_gradient += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + [3])
 
         self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
 
@@ -118,7 +118,7 @@ class DreamStudyBuffer(object):
         octave_images = [self.source]
         for new_size in self.octave_sizes[1:]:
             shrunken = source_img.resize(new_size, Image.ANTIALIAS)
-            octave_images.append(lasagne.utils.floatX(shrunken.getdata()))
+            octave_images.append(lasagne.utils.floatX(shrunken.getdata()).reshape((new_size, new_size, 3)))
 
         batch = numpy.zeros((self.batch_size,) + self.data_stream.image_shape, dtype=theano.config.floatX)
         idx = 0
@@ -127,9 +127,6 @@ class DreamStudyBuffer(object):
             for j, tile in enumerate(tiles):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
-                print("i,j %i,%i" % (i,j))
-                if i == 1:
-                    pdb.set_trace()
                 batch[idx] = octave_image[t:b,l:r,:]
                 idx += 1
 
