@@ -87,7 +87,7 @@ class DreamStudyBuffer(object):
 
     def update_source(self, batch_gradients, step_size=0.5):
         batch_gradients = numpy.rollaxis(batch_gradients, 1,4)
-        batch_images = numpy.rollaxis(self.previous_batch, 1,4)
+        batch_images = self.previous_batch
 
         octave_images = [numpy.zeros(size + [3], dtype=theano.config.floatX) for size in self.octave_sizes]
         octave_accs = [numpy.zeros(size + [3], dtype=int) for size in self.octave_sizes]
@@ -139,8 +139,8 @@ class DreamStudyBuffer(object):
                 batch[idx] = crop
                 idx += 1
 
-        self.previous_batch = numpy.rollaxis(batch, 3, 1)
-        return self.previous_batch
+        self.previous_batch = batch
+        return numpy.rollaxis(self.previous_batch, 3, 1)
 
 # Layers to choose:
 
