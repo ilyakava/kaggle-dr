@@ -120,6 +120,7 @@ class DreamStudyBuffer(object):
         # skip resizing source
         octave_images = [self.source]
         for new_size in self.octave_sizes[1:]:
+            pdb.set_trace()
             shrunken = nd.zoom(self.source, new_size + [3], order=1)
             octave_images.append(shrunken)
 
