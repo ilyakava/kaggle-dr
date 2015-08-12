@@ -100,9 +100,9 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
 
-                # lambda_ = (step_size*abs(batch_images[idx]).max()) / abs(batch_gradients[idx]).max()
-                google_lambda = (step_size) / abs(batch_gradients[idx]).mean()
-                new_image = batch_images[idx] + (google_lambda * batch_gradients[idx])
+                mean_lambda = (step_size*abs(batch_images[idx]).mean()) / abs(batch_gradients[idx]).mean()
+                # google_lambda = (step_size) / abs(batch_gradients[idx]).mean()
+                new_image = batch_images[idx] + (mean_lambda * batch_gradients[idx])
                 octave_image[t:b,l:r,:] += new_image
 
                 octave_acc[t:b,l:r,:] += 1
