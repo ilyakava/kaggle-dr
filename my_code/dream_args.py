@@ -66,5 +66,9 @@ def get():
                         "--max-itr",
                         type=int,
                         default=10)
+    parser.add_argument("-s",
+                        "--step-size",
+                        type=float,
+                        default=0.5)
 
     return parser.parse_args()

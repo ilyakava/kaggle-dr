@@ -184,7 +184,7 @@ def load_column(model_file, batch_size, train_dataset, train_labels_csv_path, ce
     column.restore(model_file)
     return column
 
-def plot_dreams(model_file, test_imagepath, max_itr, **kwargs):
+def plot_dreams(model_file, test_imagepath, max_itr, step_size, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
@@ -206,7 +206,7 @@ def plot_dreams(model_file, test_imagepath, max_itr, **kwargs):
                 scipy.misc.toimage(dsb.source).save(name, "PNG")
 
             batch_updates = column.dream_batch(1)
-            dsb.update_source(batch_updates)
+            dsb.update_source(batch_updates, step_size)
 
             itr += 1
 
@@ -220,6 +220,7 @@ if __name__ == '__main__':
     plot_dreams(model_file=_.model_file,
            test_imagepath=_.test_imagepath,
            max_itr=_.max_itr,
+           step_size=_.step_size,
            train_dataset=_.train_dataset,
            train_labels_csv_path=_.train_labels_csv_path,
            center=_.center,
