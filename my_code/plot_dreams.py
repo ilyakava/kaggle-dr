@@ -3,13 +3,6 @@ import re
 import numpy
 import cPickle
 
-# import matplotlib
-# matplotlib.use('Agg')
-# from skimage.io import imread
-# matplotlib.rcParams.update({'font.size': 2})
-# import matplotlib.pyplot as plt
-# from mpl_toolkits.axes_grid1 import AxesGrid
-
 import theano
 import lasagne
 
@@ -88,69 +81,52 @@ class DreamStudyBuffer(object):
 
         self.octave_sizes, self.octave_tile_corners = calculate_octave_and_tile_sizes(self.source_size, self.nn_image_size,
                                                                                       max_octaves=max_octaves, octave_scale=octave_scale)
-        self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
-        print("Dreaming with batch size: %i" % self.batch_size)
-        assert(self.batch_size <= 128)
+        self.batch_sizes = [len(tiles) for tiles in self.octave_tile_corners]
+        # batch size will need to be kept constant (1 octave = 1 batch, processed n_itr times)
+        self.max_batch_size = max(self.batch_sizes)
+        print("Dreaming with batch size: %i" % self.max_batch_size)
+        assert(self.max_batch_size <= 128)
 
-    def update_source(self, batch_gradients, step_size=0.5):
-        batch_gradients = numpy.rollaxis(batch_gradients, 1,4)
-        batch_images = self.previous_batch
+    def update_source(self, batch_gradients, octave, step_size):
+        gradient_tiles = numpy.rollaxis(batch_gradients, 1,4)
+        # Untile the gradient
+        untiled_gradient = numpy.zeros(self.octave_sizes[octave] + [3], dtype=theano.config.floatX)
+        untiled_gradient_normalizer = numpy.zeros(self.octave_sizes[octave] + [3], dtype=int)
 
-        octave_images = [numpy.zeros(size + [3], dtype=theano.config.floatX) for size in self.octave_sizes]
-        octave_accs = [numpy.zeros(size + [3], dtype=int) for size in self.octave_sizes]
-        idx = 0
-        for i, tiles in enumerate(self.octave_tile_corners):
-            octave_image = octave_images[i]
-            octave_acc = octave_accs[i]
-            for j, tile in enumerate(tiles):
-                t,l = tile
-                b,r = [d+self.nn_image_size for d in tile]
+        for j, tile in enumerate(self.octave_tile_corners[octave]):
+            t,l = tile
+            b,r = [d+self.nn_image_size for d in tile]
+            # normalize by mean per tile
+            # google_lambda = step_size / abs(gradient_tiles[j]).mean()
+            untiled_gradient[t:b,l:r,:] += gradient_tiles[j]
+            untiled_gradient_normalizer[t:b,l:r,:] += 1
+        normalized_untiled_gradient = untiled_gradient / untiled_gradient_normalizer
 
-                std_image_gradient = (batch_gradients[idx] - batch_gradients[idx].mean()) / batch_gradients[idx].std()
-                gradient_for_img = (std_image_gradient * (step_size*batch_images[idx].std())) + batch_images[idx].mean()
+        # Then enlarge the gradient to source size
+        zoom_in = (self.source_size / numpy.array(nself.octave_sizes[octave], dtype=float)).tolist() + [1]
+        source_size_gradient = nd.zoom(normalized_untiled_gradient, zoom_in, order=1)
+        assert(list(source_size_gradient.shape[:2]) == self.source_size.tolist())
+        # Apply the enlarged gradient to the source
+        google_lambda = step_size / abs(source_size_gradient).mean()
+        self.source += google_lambda * source_size_gradient
 
-                # mean_lambda = (step_size*abs(batch_images[idx]).mean()) / abs(batch_gradients[idx]).mean()
-                google_lambda = step_size / abs(batch_gradients[idx]).mean()
-                new_image = batch_images[idx] + (google_lambda * batch_images[idx])
-                octave_image[t:b,l:r,:] += new_image
+    def tile_source_into_batch(self, octave, mean=None, std=None):
+        octave_size = self.octave_sizes[octave]
+        zoom_out = (numpy.array(octave_size, dtype=float) / self.source_size).tolist() + [1]
+        # shrink source image
+        octave_image = nd.zoom(self.source, zoom_out, order=1)
+        assert(list(octave_image.shape[:2]) == octave_size)
 
-                octave_acc[t:b,l:r,:] += 1
-                idx += 1
-        # now average together the pixels in the many images
-        normalized_octave_images = [octave_images[i] / (len(self.octave_sizes)*octave_accs[i]) for i in range(len(octave_images))]
-        # enlarge each octave to original image size and update source image
-        cumulative_image = normalized_octave_images[0]
-        for normalized_octave_image in normalized_octave_images[1:]:
-            new_zoom = (self.source_size / numpy.array(normalized_octave_image.shape[:2], dtype=float)).tolist() + [1]
-            enlarged = nd.zoom(normalized_octave_image, new_zoom, order=1)
-            assert(list(enlarged.shape[:2]) == self.source_size.tolist())
-            cumulative_image += enlarged
-
-        self.source = cumulative_image
-
-    def serve_batch(self, mean=None, std=None):
-        # skip resizing source
-        octave_images = [self.source]
-        for new_size in self.octave_sizes[1:]:
-            new_zoom = (numpy.array(new_size, dtype=float) / self.source_size).tolist() + [1]
-            shrunken = nd.zoom(self.source, new_zoom, order=1)
-            assert(list(shrunken.shape[:2]) == new_size)
-            octave_images.append(shrunken)
-
-        batch = numpy.zeros((self.batch_size,self.nn_image_size,self.nn_image_size,3), dtype=theano.config.floatX)
-        idx = 0
-        for i, tiles in enumerate(self.octave_tile_corners):
-            octave_image = octave_images[i]
-            for j, tile in enumerate(tiles):
-                t,l = tile
-                b,r = [d+self.nn_image_size for d in tile]
-                crop = octave_image[t:b,l:r,:]
-                if not mean == None:
-                    crop = crop - mean
-                if not std == None:
-                    crop = crop / (std + 1e-5)
-                batch[idx] = crop
-                idx += 1
+        batch = numpy.zeros((self.max_batch_size,self.nn_image_size,self.nn_image_size,3), dtype=theano.config.floatX)
+        for j, tile in enumerate(tiles):
+            t,l = tile
+            b,r = [d+self.nn_image_size for d in tile]
+            crop = octave_image[t:b,l:r,:]
+            if not mean == None:
+                crop = crop - mean
+            if not std == None:
+                crop = crop / (std + 1e-5)
+            batch[j] = crop
 
         self.previous_batch = batch
         return numpy.rollaxis(self.previous_batch, 3, 1)
@@ -202,32 +178,34 @@ def load_column(model_file, batch_size, train_dataset, train_labels_csv_path, ce
     column.restore(model_file)
     return column
 
-def plot_dreams(model_file, test_imagepath, max_itr, step_size, max_octaves, octave_scale, **kwargs):
+def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size, max_octaves, octave_scale, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
     nn_image_size = get_nn_image_size(model_file)
 
+    # precalc octaves and tiles, as well as max batch size
     dsb = DreamStudyBuffer(test_imagepath, nn_image_size, max_octaves, octave_scale)
+    max_nn_pass = len(dsb.octave_sizes) * itr_per_octave
 
-    column = load_column(model_file, batch_size=dsb.batch_size, **kwargs)
+    column = load_column(model_file, batch_size=dsb.max_batch_size, **kwargs)
 
     try:
-        itr = 0
-        column.x_buffer.set_value(lasagne.utils.floatX(dsb.serve_batch(column.ds.mean, column.ds.std)), borrow=True)
-        while itr <= max_itr:
+        nn_pass = 0
+        for octave, octave_size in reversed(list(enumerate(dsb.octave_sizes))):
+            for itr in range(itr_per_octave):
+                next_batch = dsb.tile_source_to_batch( octave, column.ds.mean, column.ds.std )
+                column.x_buffer.set_value(lasagne.utils.floatX(next_batch), borrow=True)
 
-            if (itr in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_itr),10)])):
-                name = 'data/dreams/%i_itr.png' % itr
-                print("saving %s" % name)
-                scipy.misc.toimage(dsb.source).save(name, "PNG")
+                batch_updates = column.dream_batch(1)
 
-            batch_updates = column.dream_batch(1)
-            dsb.update_source(batch_updates, step_size)
-            column.x_buffer.set_value(lasagne.utils.floatX(dsb.serve_batch()), borrow=True)
+                dsb.update_source( batch_updates, octave, step_size )
 
-            itr += 1
-
+                if (nn_pass in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_nn_pass),10)])):
+                    name = 'data/dreams/%i_nnpass_%i_itr_%i_octave.png' % (nn_pass, itr, octave)
+                    print("saving %s" % name)
+                    scipy.misc.toimage(dsb.source).save(name, "PNG")
+                nn_pass += 1
     except KeyboardInterrupt:
         print "[ERROR] User terminated Dream Study"
     print "Done"
@@ -237,7 +215,7 @@ if __name__ == '__main__':
 
     plot_dreams(model_file=_.model_file,
            test_imagepath=_.test_imagepath,
-           max_itr=_.max_itr,
+           itr_per_octave=_.itr_per_octave,
            step_size=_.step_size,
            max_octaves=_.max_octaves,
            octave_scale=_.octave_scale,

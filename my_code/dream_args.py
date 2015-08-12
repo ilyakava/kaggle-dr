@@ -62,14 +62,14 @@ def get():
                         default=1,
                         choices=[0,1],
                         help="If you do not have a GPU, you must pass '-cc 0' (and don't forget to set THEANO_FLAGS='device=cpu'). If 1: use cuda_convnet library for convolutions which requires a GPU. Else use theano defaults which work on CPU and GPU.")
-    parser.add_argument("-m",
-                        "--max-itr",
+    parser.add_argument("-",
+                        "--itr-per-octave",
                         type=int,
                         default=10)
     parser.add_argument("-s",
                         "--step-size",
                         type=float,
-                        default=0.5)
+                        default=1.5)
     parser.add_argument("-o",
                         "--max-octaves",
                         type=int,
