@@ -20,6 +20,7 @@ import my_code.dream_args as args
 from my_code.predict import model_runid
 
 import scipy.misc
+import scipy.ndimage as nd
 from skimage.io import imread
 from PIL import Image
 
@@ -110,19 +111,17 @@ class DreamStudyBuffer(object):
         # enlarge each octave to original image size and update source image
         cumulative_image = normalized_octave_images[0]
         for normalized_octave_image in normalized_octave_images[1:]:
-            img = scipy.misc.toimage(normalized_octave_image)
-            enlarged = img.resize(self.source_size, Image.ANTIALIAS)
-            cumulative_image += lasagne.utils.floatX(enlarged.getdata()).reshape(self.source_size + (3,))
+            enlarged = nd.zoom(normalized_octave_image, self.source_size + [3], order=1)
+            cumulative_image += enlarged
 
         self.source = cumulative_image
 
     def serve_batch(self, mean=None, std=None):
-        source_img = scipy.misc.toimage(self.source)
         # skip resizing source
         octave_images = [self.source]
         for new_size in self.octave_sizes[1:]:
-            shrunken = source_img.resize(new_size, Image.ANTIALIAS)
-            octave_images.append(lasagne.utils.floatX(shrunken.getdata()).reshape(new_size + [3]))
+            shrunken = nd.zoom(self.source, new_size + [3], order=1)
+            octave_images.append(shrunken)
 
         batch = numpy.zeros((self.batch_size,self.nn_image_size,self.nn_image_size,3), dtype=theano.config.floatX)
         idx = 0
