@@ -85,9 +85,6 @@ class DreamStudyBuffer(object):
         self.batch_size = sum([len(tiles) for tiles in self.octave_tile_corners])
         assert(self.batch_size <= 128)
 
-    def set_data_stream(self, data_stream):
-        self.data_stream = data_stream
-
     def update_source(self, batch_gradients, step_size=0.5):
         batch_gradients = numpy.rollaxis(batch_gradients, 1,4)
         batch_images = numpy.rollaxis(self.previous_batch, 1,4)
@@ -119,7 +116,7 @@ class DreamStudyBuffer(object):
 
         self.source = cumulative_image
 
-    def serve_batch(self):
+    def serve_batch(self, mean=None, std=None):
         source_img = scipy.misc.toimage(self.source)
         # skip resizing source
         octave_images = [self.source]
@@ -135,10 +132,10 @@ class DreamStudyBuffer(object):
                 t,l = tile
                 b,r = [d+self.nn_image_size for d in tile]
                 crop = octave_image[t:b,l:r,:]
-                if not self.data_stream.mean == None:
-                    crop = crop - self.data_stream.mean
-                if not self.data_stream.std == None:
-                    crop = crop / (self.data_stream.std + 1e-5)
+                if not mean == None:
+                    crop = crop - mean
+                if not std == None:
+                    crop = crop / (std + 1e-5)
                 batch[idx] = crop
                 idx += 1
 
@@ -201,12 +198,11 @@ def plot_dreams(model_file, test_imagepath, max_itr, step_size, **kwargs):
     dsb = DreamStudyBuffer(test_imagepath, nn_image_size)
 
     column = load_column(model_file, batch_size=dsb.batch_size, **kwargs)
-    dsb.set_data_stream(column.ds)
 
     try:
         itr = 0
+        column.x_buffer.set_value(lasagne.utils.floatX(dsb.serve_batch(column.ds.mean, column.ds.std)), borrow=True)
         while itr <= max_itr:
-            column.x_buffer.set_value(lasagne.utils.floatX(dsb.serve_batch()), borrow=True)
 
             if (itr in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_itr),10)])):
                 name = 'data/dreams/%i_itr.png' % itr
@@ -215,6 +211,7 @@ def plot_dreams(model_file, test_imagepath, max_itr, step_size, **kwargs):
 
             batch_updates = column.dream_batch(1)
             dsb.update_source(batch_updates, step_size)
+            column.x_buffer.set_value(lasagne.utils.floatX(dsb.serve_batch()), borrow=True)
 
             itr += 1
 
