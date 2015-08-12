@@ -111,6 +111,7 @@ class DreamStudyBuffer(object):
         # google_lambda = step_size / abs(source_size_gradient).mean()
         percent_lambda = (step_size*abs(self.source).max()) / abs(source_size_gradient).max()
         self.source += percent_lambda * source_size_gradient
+        pdb.set_trace()
         self.source = (self.source / self.source.mean()) * old_mean # multiply mean down
         # self.source = self.source - (self.source.mean() - old_mean) # subtract mean down (high contrast kept)
         self.source = numpy.clip(self.source, 0.0, 255.0)
