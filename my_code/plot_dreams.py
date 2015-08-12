@@ -102,8 +102,7 @@ class DreamStudyBuffer(object):
                 octave_image[t:b,l:r,:] = image_gradients[idx]
                 octave_acc[t:b,l:r,:] += 1
                 idx += 1
-        pdb.set_trace()
-        normalized_octave_images = [octave_image / (len(self.octave_sizes)*octave_accs) for octave_image in octave_images]
+        normalized_octave_images = [octave_images[i] / (len(self.octave_sizes)*octave_accs[i]) for i in range(len(octave_images))]
 
         # enlarge each octave to original image size and update source image
         cumulative_gradient = normalized_octave_images[:1]
