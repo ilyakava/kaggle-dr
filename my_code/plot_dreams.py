@@ -192,7 +192,7 @@ def plot_dreams(model_file, test_imagepath, max_itr, **kwargs):
     dsb = DreamStudyBuffer(test_imagepath, nn_image_size)
 
     column = load_column(model_file, batch_size=dsb.batch_size, **kwargs)
-    dsb.set_data_stream(column.ds, test_imagepath)
+    dsb.set_data_stream(column.ds)
 
     try:
         itr = 0
