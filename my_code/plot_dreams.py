@@ -111,9 +111,8 @@ class DreamStudyBuffer(object):
         # enlarge each octave to original image size and update source image
         cumulative_image = normalized_octave_images[0]
         for normalized_octave_image in normalized_octave_images[1:]:
-            new_zoom = (self.source_size / numpy.array(normalized_octave_image.shape[:2])).tolist() + [1]
+            new_zoom = (self.source_size / numpy.array(normalized_octave_image.shape[:2], dtype=float)).tolist() + [1]
             enlarged = nd.zoom(normalized_octave_image, new_zoom, order=1)
-            pdb.set_trace()
             assert(list(enlarged.shape[:2]) == self.source_size.tolist())
             cumulative_image += enlarged
 
