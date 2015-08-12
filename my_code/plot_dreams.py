@@ -113,7 +113,7 @@ class DreamStudyBuffer(object):
         self.source += ((step_size*numpy.abs(self.source).max())/numpy.abs(cumulative_gradient).max()) * cumulative_gradient
 
     def serve_batch(self):
-        source_img = scipy.misc.toimage(source)
+        source_img = scipy.misc.toimage(self.source)
         # skip resizing source
         octave_images = [self.source]
         for new_size in self.octave_sizes[1:]:
