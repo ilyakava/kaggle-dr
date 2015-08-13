@@ -20,53 +20,12 @@ from PIL import Image
 
 import pdb
 
-def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0):
-    """
-    :type source_size: Array of 2 integers
-    :param source_size: [height, width] of image to have the dream
-
-    :type nn_image_size: integer
-    """
-    # find octave sizes
-    # array of [h,w] arrays
-    octave_sizes = [list(source_size)]
-    while len(octave_sizes) < max_octaves and min(octave_sizes[-1]) > nn_image_size:
-        min_dim = min(octave_sizes[-1])
-        scale = min(octave_scale, float(min_dim) / nn_image_size)
-
-        new_dims = [int(dim / scale) for dim in octave_sizes[-1]]
-        octave_sizes.append(new_dims)
-    assert(numpy.array(octave_sizes).min() >= nn_image_size)
-
-    # calculate tile limits per octave (and normalizing coefs)
-    octave_tile_corners = []
-    for size in octave_sizes:
-        h,w = size
-        max_h = (h-nn_image_size); max_w = (w-nn_image_size);
-        stride = int(nn_image_size - overlap_percentage*nn_image_size)
-
-        tops = [0]
-        while tops[-1] < max_h:
-            tops.append(tops[-1]+stride)
-        tops[-1] = max_h
-
-        lefts = [0]
-        while lefts[-1] < max_w:
-            lefts.append(lefts[-1]+stride)
-        lefts[-1] = max_w
-
-        tile_corners = []
-        for top in tops:
-            for left in lefts:
-                if not [top,left] in tile_corners:
-                    tile_corners.append([top,left])
-        octave_tile_corners.append(tile_corners)
-    return(octave_sizes,octave_tile_corners)
-
 class DreamStudyBuffer(object):
     """
-    Keeps the state of the dream in a double buffer
+    Idea is to keep the state of the dream in a double buffer
     (source->batch, batch_output->source, and repeat)
+
+    Unfortunately, tile artifacts show up with enough of a step size.
     """
 
     def __init__(self, test_imagepath, nn_image_size, max_octaves, octave_scale):
@@ -158,34 +117,49 @@ class DreamNet(VGGNet):
             }
         )
 
-# Layers to choose:
 
-# 1: ShuffleBC01ToC01BLayer
-# 2: Conv2DCCLayer
-# 3: MaxPool2DCCLayer
-# 4: DropoutLayer
-# 5: Conv2DCCLayer
-# 6: MaxPool2DCCLayer
-# 7: DropoutLayer
-# 8: Conv2DCCLayer
-# 9: DropoutLayer
-# 10: Conv2DCCLayer
-# 11: MaxPool2DCCLayer
-# 12: DropoutLayer
-# 13: Conv2DCCLayer
-# 14: MaxPool2DCCLayer
-# 15: DropoutLayer
-# 16: Conv2DCCLayer
-# 17: MaxPool2DCCLayer
-# 18: ShuffleC01BToBC01Layer
-# 19: DropoutLayer
-# 20: DenseLayer
-# 21: FeaturePoolLayer
-# 22: DropoutLayer
-# 23: DenseLayer
-# 24: FeaturePoolLayer
-# 25: DropoutLayer
-# 26: DenseLayer
+def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0.25):
+    """
+    :type source_size: Array of 2 integers
+    :param source_size: [height, width] of image to have the dream
+
+    :type nn_image_size: integer
+    """
+    # find octave sizes
+    # array of [h,w] arrays
+    octave_sizes = [list(source_size)]
+    while len(octave_sizes) < max_octaves and min(octave_sizes[-1]) > nn_image_size:
+        min_dim = min(octave_sizes[-1])
+        scale = min(octave_scale, float(min_dim) / nn_image_size)
+
+        new_dims = [int(dim / scale) for dim in octave_sizes[-1]]
+        octave_sizes.append(new_dims)
+    assert(numpy.array(octave_sizes).min() >= nn_image_size)
+
+    # calculate tile limits per octave (and normalizing coefs)
+    octave_tile_corners = []
+    for size in octave_sizes:
+        h,w = size
+        max_h = (h-nn_image_size); max_w = (w-nn_image_size);
+        stride = int(nn_image_size - overlap_percentage*nn_image_size)
+
+        tops = [0]
+        while tops[-1] < max_h:
+            tops.append(tops[-1]+stride)
+        tops[-1] = max_h
+
+        lefts = [0]
+        while lefts[-1] < max_w:
+            lefts.append(lefts[-1]+stride)
+        lefts[-1] = max_w
+
+        tile_corners = []
+        for top in tops:
+            for left in lefts:
+                if not [top,left] in tile_corners:
+                    tile_corners.append([top,left])
+        octave_tile_corners.append(tile_corners)
+    return(octave_sizes,octave_tile_corners)
 
 def get_nn_image_size(model_file):
     f = open(model_file)
@@ -243,19 +217,19 @@ if __name__ == '__main__':
     _ = args.get()
 
     plot_dreams(model_file=_.model_file,
-           test_imagepath=_.test_imagepath,
-           itr_per_octave=_.itr_per_octave,
-           step_size=_.step_size,
-           max_octaves=_.max_octaves,
-           octave_scale=_.octave_scale,
-           layer_idx_of_interest=_.layer_idx_of_interest,
-           train_dataset=_.train_dataset,
-           train_labels_csv_path=_.train_labels_csv_path,
-           center=_.center,
-           normalize=_.normalize,
-           train_flip=_.train_flip,
-           test_dataset=None,
-           random_seed=_.random_seed,
-           valid_dataset_size=_.valid_dataset_size,
-           filter_shape=_.filter_shape,
-           cuda_convnet=_.cuda_convnet)
+                test_imagepath=_.test_imagepath,
+                itr_per_octave=_.itr_per_octave,
+                step_size=_.step_size,
+                max_octaves=_.max_octaves,
+                octave_scale=_.octave_scale,
+                layer_idx_of_interest=_.layer_idx_of_interest,
+                train_dataset=_.train_dataset,
+                train_labels_csv_path=_.train_labels_csv_path,
+                center=_.center,
+                normalize=_.normalize,
+                train_flip=_.train_flip,
+                test_dataset=None,
+                random_seed=_.random_seed,
+                valid_dataset_size=_.valid_dataset_size,
+                filter_shape=_.filter_shape,
+                cuda_convnet=_.cuda_convnet)
