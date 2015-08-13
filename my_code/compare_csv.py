@@ -13,15 +13,6 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 
 import pdb
 
-def save_confusion_matrix(M, outpath='plots/conf.png'):
-    plt.matshow(M, cmap='Greys')
-    plt.title('Confusion matrix')
-    plt.colorbar()
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label (Accuracy: %.4f)' % (numpy.diag(M).sum() / float(M.sum())))
-    print("Saving figure as: %s" % outpath)
-    plt.savefig(outpath, dpi=600, bbox_inches='tight')
-
 TAGS = ['woman', 'horse', 'hand', 'flower', 'bird', 'mountain', 'house', 'circle', 'tree', 'car']
 
 def plot_confusion_matrix(M, labels=TAGS, outpath='plots/conf.png'):
