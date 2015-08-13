@@ -19,7 +19,8 @@ def csv_agreement(file1, file2):
         y1.append(d1[image])
         y2.append(d2[image])
         overlaps[image] = [d1[image], d2[image]]
-    kappa, M = QWK(numpy.array(y1),numpy.array(y2))
+    K = max(numpy.array(y1).max(), numpy.array(y2).max()) + 1
+    kappa, M = QWK(numpy.array(y1),numpy.array(y2), K)
     print "Kappa = %.5f" % kappa
     print_confusion_matrix(M)
     return overlaps
