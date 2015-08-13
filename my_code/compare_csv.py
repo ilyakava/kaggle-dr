@@ -22,6 +22,7 @@ def csv_agreement(file1, file2):
     K = max(numpy.array(y1).max(), numpy.array(y2).max()) + 1
     kappa, M = QWK(numpy.array(y1),numpy.array(y2), K)
     print "Kappa = %.5f" % kappa
+    print "Accuracy = %.5f" % (numpy.diag(M).sum() / float(M.sum()))
     print_confusion_matrix(M)
     return overlaps
 
