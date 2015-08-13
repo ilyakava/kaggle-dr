@@ -14,8 +14,7 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 import pdb
 
 def save_confusion_matrix(M, outpath='plots/conf.png'):
-    set_cmap('gray')
-    plt.matshow(M)
+    plt.matshow(M, cmap='Greys')
     plt.title('Confusion matrix')
     plt.colorbar()
     plt.ylabel('True label')
