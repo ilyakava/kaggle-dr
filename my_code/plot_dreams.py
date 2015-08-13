@@ -20,7 +20,7 @@ from PIL import Image
 
 import pdb
 
-def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0.25):
+def calculate_octave_and_tile_sizes(source_size, nn_image_size, max_octaves=4, octave_scale=1.4, overlap_percentage=0):
     """
     :type source_size: Array of 2 integers
     :param source_size: [height, width] of image to have the dream
@@ -101,7 +101,7 @@ class DreamStudyBuffer(object):
             # google_lambda = step_size / abs(gradient_tiles[j]).mean()
             untiled_gradient[t:b,l:r,:] += gradient_tiles[j]
             untiled_gradient_normalizer[t:b,l:r,:] += 1
-        normalized_untiled_gradient = untiled_gradient #/ untiled_gradient_normalizer
+        normalized_untiled_gradient = untiled_gradient / untiled_gradient_normalizer
 
         # Then enlarge the gradient to source size
         zoom_in = (self.source_size / numpy.array(self.octave_sizes[octave], dtype=float)).tolist() + [1]
