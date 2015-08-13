@@ -24,7 +24,7 @@ def save_confusion_matrix(M, outpath='plots/conf.png'):
 
 TAGS = ['woman', 'horse', 'hand', 'flower', 'bird', 'mountain', 'house', 'circle', 'tree', 'car']
 
-def plot_confusion_matrix(M, labels=TAGS):
+def plot_confusion_matrix(M, labels=TAGS, outpath='plots/conf.png'):
     plt.imshow(M, interpolation='nearest', cmap=plt.cm.Greys)
     plt.title('Confusion matrix')
     plt.colorbar()
