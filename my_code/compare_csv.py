@@ -4,7 +4,23 @@ import numpy
 import pandas
 from my_code.predict_util import QWK, print_confusion_matrix
 
+import matplotlib
+matplotlib.use('Agg')
+from skimage.io import imread
+matplotlib.rcParams.update({'font.size': 2})
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import AxesGrid
+
 import pdb
+
+def save_confusion_matrix(M, outpath='results/conf.png'):
+    plt.matshow(M)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    print("Saving figure as: %s" % outpath)
+    plt.savefig(outpath, dpi=600, bbox_inches='tight')
 
 def csv_agreement(file1, file2):
     f1 = pandas.read_csv(file1)
@@ -24,6 +40,7 @@ def csv_agreement(file1, file2):
     print "Kappa = %.5f" % kappa
     print "Accuracy = %.5f" % (numpy.diag(M).sum() / float(M.sum()))
     print_confusion_matrix(M)
+    save_confusion_matrix(M)
     return overlaps
 
 if __name__ == '__main__':
