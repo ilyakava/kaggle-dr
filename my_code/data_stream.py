@@ -191,6 +191,7 @@ class DataStream(object):
             self.n_train_batches = int(len(self.train_dataset["X"]) / self.batch_size) # override in case Sampler is used (TODO make this neater)
         self.train_dataset_size = self.n_train_batches * self.batch_size
 
+        pdb.set_trace()
         if self.center == 1 or self.normalize == 1:
             self.calc_mean_std_image()
 
