@@ -22,10 +22,23 @@ import pdb
 
 class DreamStudyBuffer(object):
     """
+    Modeled from: https://github.com/google/deepdream/blob/master/dream.ipynb
+    except here, the input size to the network is fixed, so the image
+    is broken up into tiles that make up a batch, which are then reconstructed
+    and applied to the source image after every batch runs through (batch size
+    is equal to the number of tiles it takes to break up the image)
+
     Idea is to keep the state of the dream in a double buffer
     (source->batch, batch_output->source, and repeat)
 
     Unfortunately, tile artifacts show up with enough of a step size.
+
+    One possible solution is to randomly set overlap_percentage on every batch
+    and iterate many times with a small step size. Another possible solution is
+    to process tiles with a padding, and cut off the edges of the results b/c
+    the edges are the lowest intensity, and will lead to tile artifacts when
+    not overlapping. Another solution is some sort of local brightness or contrast
+    normalization in the tile gradients.
     """
 
     def __init__(self, test_imagepath, nn_image_size, max_octaves, octave_scale):
