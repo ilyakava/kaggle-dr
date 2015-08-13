@@ -193,7 +193,7 @@ class DataStream(object):
 
         import shutil
         for im in self.valid_dataset["X"]:
-            shutil.copy("data/train_artsy/smaller_220/%s.png" % im, "data/train_artsy/valid_r1991_v1024/%s.png" % im)
+            shutil.copy("data/train_imagenet/smaller_220/%s.png" % im, "data/train_imagenet/valid_r1991_v1024/%s.png" % im)
 
         pdb.set_trace()
         if self.center == 1 or self.normalize == 1:
