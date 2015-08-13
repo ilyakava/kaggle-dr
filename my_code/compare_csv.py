@@ -28,7 +28,7 @@ def plot_confusion_matrix(M, labels=TAGS):
     plt.imshow(M, interpolation='nearest', cmap=plt.cm.Greys)
     plt.title('Confusion matrix')
     plt.colorbar()
-    tick_marks = np.arange(len(labels))
+    tick_marks = numpy.arange(len(labels))
     plt.xticks(tick_marks, labels, rotation=45)
     plt.yticks(tick_marks, labels)
     plt.tight_layout()
