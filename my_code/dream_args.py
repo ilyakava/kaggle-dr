@@ -19,13 +19,13 @@ def get():
     parser.add_argument("-c",
                         "--center",
                         type=int,
-                        default=1,
-                        help="Sumtract mean example from examples.")
+                        default=0,
+                        help="Sumtract mean example from examples. Centering will bring out tiling artifacts.")
     parser.add_argument("-z",
                         "--normalize",
                         type=int,
-                        default=1,
-                        help="Divide examples by std dev of examples.")
+                        default=0,
+                        help="Divide examples by std dev of examples. Not used by google in their deep dreaming.")
     parser.add_argument("-F",
                         "--train-flip",
                         type=str,
@@ -46,10 +46,6 @@ def get():
                         type=int,
                         default=1664,
                         help="Validation set size (4864=14%, 3456=10%, 1664=5%)")
-    parser.add_argument("-p",
-                        "--patch-size",
-                        type=int,
-                        default=11)
     parser.add_argument("-fs",
                         "--filter-shape",
                         type=str,
