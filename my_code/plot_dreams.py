@@ -122,7 +122,7 @@ class DreamNet(VGGNet):
         X_batch = T.tensor4('x2')
         my_input = X_batch
         layer = lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True)
-        layer_shape = layer.get_output_shape(self.all_layers[layer_idx_of_interest])
+        layer_shape = lasagne.layers.get_output_shape(self.all_layers[layer_idx_of_interest])
         if max_filter_idx == 0:
             max_filter_idx = layer_shape[0]
         if not (min_filter_idx >= 0 and max_filter_idx <= layer_shape[0]):
