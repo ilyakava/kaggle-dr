@@ -120,6 +120,7 @@ class DreamNet(VGGNet):
 
         X_batch = T.tensor4('x2')
         my_input = X_batch
+        pdb.set_trace()
         l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True) ** 2)
         dream_updates = lasagne.updates.sgd(l2_activations, [my_input], 1)
         self.dream_batch = theano.function(
