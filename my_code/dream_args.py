@@ -83,5 +83,15 @@ def get():
                         type=int,
                         default=20,
                         help="For vgg_mini7b_leak_sig_ecp, CONV layers are: [2,5,8,10,13,16]")
+    parser.add_argument("-f1",
+                        "--min-filter-idx",
+                        type=int,
+                        default=0,
+                        help="First index of filter to use. Enter '0' to get the very first filter.")
+    parser.add_argument("-f2",
+                        "--max-filter-idx",
+                        type=int,
+                        default=0,
+                        help="Exclusive index of last filter to use. Enter '0' to get the very last filter.")
 
     return parser.parse_args()
