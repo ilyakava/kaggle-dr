@@ -2,30 +2,9 @@ import sys
 import csv
 import numpy
 import pandas
-from my_code.predict_util import QWK, print_confusion_matrix
-
-import matplotlib
-matplotlib.use('Agg')
-from skimage.io import imread
-matplotlib.rcParams.update({'font.size': 12})
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import AxesGrid
+from my_code.predict_util import QWK, print_confusion_matrix, save_confusion_matrix_plot
 
 import pdb
-
-TAGS = ['woman', 'horse', 'hand', 'flower', 'bird', 'mountain', 'house', 'circle', 'tree', 'car']
-
-def plot_confusion_matrix(M, labels=TAGS, outpath='plots/conf.png'):
-    plt.imshow(M, interpolation='nearest', cmap=plt.cm.Greys)
-    plt.title('Confusion matrix')
-    plt.colorbar()
-    tick_marks = numpy.arange(len(labels))
-    plt.xticks(tick_marks, labels, rotation=45)
-    plt.yticks(tick_marks, labels)
-    plt.tight_layout()
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label (Accuracy: %.4f)' % (numpy.diag(M).sum() / float(M.sum())))
-    plt.savefig(outpath, dpi=600, bbox_inches='tight')
 
 def csv_agreement(file1, file2):
     f1 = pandas.read_csv(file1)
@@ -45,7 +24,7 @@ def csv_agreement(file1, file2):
     print "Kappa = %.5f" % kappa
     print "Accuracy = %.5f" % (numpy.diag(M).sum() / float(M.sum()))
     print_confusion_matrix(M)
-    plot_confusion_matrix(M)
+    save_confusion_matrix_plot(M)
     return overlaps
 
 if __name__ == '__main__':
