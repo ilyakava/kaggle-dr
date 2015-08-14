@@ -1,6 +1,13 @@
 import numpy
 from sklearn.metrics import confusion_matrix
 
+import matplotlib
+matplotlib.use('Agg')
+from skimage.io import imread
+matplotlib.rcParams.update({'font.size': 12})
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import AxesGrid
+
 import pdb
 
 class UnsupportedPredictedClasses(Exception):
@@ -10,6 +17,20 @@ def assert_valid_prediction(y_pred, K):
     forbidden_klasses = set(y_pred.flatten()) - set(list(range(K)))
     if len(forbidden_klasses):
         raise UnsupportedPredictedClasses(forbidden_klasses)
+
+def save_confusion_matrix_plot(M, labels=None, outpath='plots/conf.png'):
+    plt.imshow(M, interpolation='nearest', cmap=plt.cm.Greys)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+    if labels:
+        tick_marks = numpy.arange(len(labels))
+        plt.xticks(tick_marks, labels, rotation=45)
+        plt.yticks(tick_marks, labels)
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label (Accuracy: %.4f)' % (numpy.diag(M).sum() / float(M.sum())))
+    print("Saving %s" % outpath)
+    plt.savefig(outpath, dpi=600, bbox_inches='tight')
 
 def print_confusion_matrix(M):
     K = M.shape[0]

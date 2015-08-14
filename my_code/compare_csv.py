@@ -2,7 +2,7 @@ import sys
 import csv
 import numpy
 import pandas
-from my_code.predict_util import QWK, print_confusion_matrix
+from my_code.predict_util import QWK, print_confusion_matrix, save_confusion_matrix_plot
 
 import pdb
 
@@ -19,9 +19,12 @@ def csv_agreement(file1, file2):
         y1.append(d1[image])
         y2.append(d2[image])
         overlaps[image] = [d1[image], d2[image]]
-    kappa, M = QWK(numpy.array(y1),numpy.array(y2))
+    K = max(numpy.array(y1).max(), numpy.array(y2).max()) + 1
+    kappa, M = QWK(numpy.array(y1),numpy.array(y2), K)
     print "Kappa = %.5f" % kappa
+    print "Accuracy = %.5f" % (numpy.diag(M).sum() / float(M.sum()))
     print_confusion_matrix(M)
+    save_confusion_matrix_plot(M)
     return overlaps
 
 if __name__ == '__main__':
