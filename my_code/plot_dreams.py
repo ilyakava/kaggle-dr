@@ -127,7 +127,8 @@ class DreamNet(VGGNet):
             max_filter_idx = layer_shape[0]
         if not (min_filter_idx >= 0 and max_filter_idx <= layer_shape[0]):
             raise ValueError('Asked for filters %i->%i when only %i filters are available' % (min_filter_idx, max_filter_idx, layer_shape[0]))
-        l2_activations = T.sum(layer[min_filter_idx:max_filter_idx] ** 2)
+
+        l2_activations = T.sum(T.max(layer, axis=0) ** 2)
         dream_updates = lasagne.updates.sgd(l2_activations, [my_input], 1)
         self.dream_batch = theano.function(
             [],
