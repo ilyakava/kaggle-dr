@@ -111,7 +111,8 @@ class DreamStudyBuffer(object):
         return numpy.rollaxis(self.previous_batch, 3, 1)
 
 class DreamNet(VGGNet):
-    def __init__(self, layer_idx_of_interest, data_stream, batch_size, init_learning_rate, momentum,
+    def __init__(self, layer_idx_of_interest, min_filter_idx, max_filter_idx,
+                 data_stream, batch_size, init_learning_rate, momentum,
                  leak_alpha, model_spec, loss_type, num_output_classes, pad,
                  image_shape, filter_shape, cuda_convnet=1, runid=None):
         super(DreamNet, self).__init__(data_stream, batch_size, init_learning_rate, momentum,
@@ -120,7 +121,13 @@ class DreamNet(VGGNet):
 
         X_batch = T.tensor4('x2')
         my_input = X_batch
-        l2_activations = T.sum(lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True) ** 2)
+        layer = lasagne.layers.get_output(self.all_layers[layer_idx_of_interest], my_input, deterministic=True)
+        layer_shape = lasagne.layers.get_output_shape(self.all_layers[layer_idx_of_interest])
+        if max_filter_idx == 0:
+            max_filter_idx = layer_shape[0]
+        if not (min_filter_idx >= 0 and max_filter_idx <= layer_shape[0]):
+            raise ValueError('Asked for filters %i->%i when only %i filters are available' % (min_filter_idx, max_filter_idx, layer_shape[0]))
+        l2_activations = T.sum(layer[min_filter_idx:max_filter_idx] ** 2)
         dream_updates = lasagne.updates.sgd(l2_activations, [my_input], 1)
         self.dream_batch = theano.function(
             [],
@@ -180,7 +187,7 @@ def get_nn_image_size(model_file):
     f.close()
     return image_shape[0]
 
-def load_column(model_file, batch_size, layer_idx_of_interest, train_dataset, train_labels_csv_path, center, normalize, train_flip,
+def load_column(model_file, batch_size, layer_idx_of_interest, min_filter_idx, max_filter_idx, train_dataset, train_labels_csv_path, center, normalize, train_flip,
                 test_dataset, random_seed, valid_dataset_size, filter_shape, cuda_convnet):
     print("Loading Model...")
     f = open(model_file)
@@ -188,12 +195,13 @@ def load_column(model_file, batch_size, layer_idx_of_interest, train_dataset, tr
     data_stream = DataStream(train_image_dir=train_dataset, train_labels_csv_path=train_labels_csv_path, image_shape=image_shape, batch_size=batch_size, cache_size_factor=1, center=center, normalize=normalize, train_flip=train_flip, test_image_dir=test_dataset, random_seed=random_seed, valid_dataset_size=valid_dataset_size)
     f.close()
 
-    column = DreamNet(layer_idx_of_interest, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet)
+    column = DreamNet(layer_idx_of_interest, min_filter_idx, max_filter_idx, data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet)
     column.restore(model_file)
     return column
 
 def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size,
-                max_octaves, octave_scale, layer_idx_of_interest, **kwargs):
+                max_octaves, octave_scale, layer_idx_of_interest,
+                min_filter_idx, max_filter_idx, **kwargs):
     assert(model_file)
     runid = model_runid(model_file)
 
@@ -203,7 +211,7 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size,
     dsb = DreamStudyBuffer(test_imagepath, nn_image_size, max_octaves, octave_scale)
     max_nn_pass = len(dsb.octave_sizes) * itr_per_octave
 
-    column = load_column(model_file, batch_size=dsb.max_batch_size, layer_idx_of_interest=layer_idx_of_interest, **kwargs)
+    column = load_column(model_file, batch_size=dsb.max_batch_size, layer_idx_of_interest=layer_idx_of_interest, min_filter_idx=min_filter_idx, max_filter_idx=max_filter_idx, **kwargs)
 
     try:
         nn_pass = 0
@@ -217,7 +225,7 @@ def plot_dreams(model_file, test_imagepath, itr_per_octave, step_size,
                 dsb.update_source( batch_updates, octave, step_size )
 
                 nn_pass += 1
-                if (nn_pass in set([0] + [int(i) for i in numpy.logspace(0,numpy.log10(max_nn_pass),10)])):
+                if (nn_pass in set([int(i) for i in numpy.linspace(0,max_nn_pass,10)])):
                     name = 'data/dreams/%i_nnpass_%i_itr_%i_octave.png' % (nn_pass, itr, octave)
                     print("saving %s" % name)
                     scipy.misc.toimage(numpy.uint8(dsb.source)).save(name, "PNG")
@@ -236,6 +244,8 @@ if __name__ == '__main__':
                 max_octaves=_.max_octaves,
                 octave_scale=_.octave_scale,
                 layer_idx_of_interest=_.layer_idx_of_interest,
+                min_filter_idx=_.min_filter_idx,
+                max_filter_idx=_.max_filter_idx,
                 train_dataset=_.train_dataset,
                 train_labels_csv_path=_.train_labels_csv_path,
                 center=_.center,
