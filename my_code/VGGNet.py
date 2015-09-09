@@ -299,9 +299,10 @@ class VGGNet(object):
                                     nonlinearity=get_nonlinearity(cs),
                                     **kwargs))
                 if cs.get("pool_size"):
+                    pool_stride = cs.get("pool_stride") or cs["pool_size"]
                     all_layers.append(self.maxOp(all_layers[-1],
                                         pool_size=(cs["pool_size"], cs["pool_size"]),
-                                        stride=(cs["pool_stride"], cs["pool_stride"]),
+                                        stride=(pool_stride, pool_stride),
                                         **kwargs))
             elif cs["type"] == "FC":
                 if (model_spec[i-1]["type"] == "CONV") and (filter_shape == 'c01b'):
