@@ -405,7 +405,7 @@ class VGGNet(object):
             # TODO could start decaying flip noise when val loss plateaus
             raise NotImplementedError()
 
-    def validate(self, silent=False):
+    def validate(self, print_confusion_mat):
         """
         Iterates through validation minibatches
         """
@@ -424,11 +424,13 @@ class VGGNet(object):
                           (self.epoch, (self.iter + 1) % self.n_train_batches, self.n_train_batches,
                            val_loss * 100.))
         print('     kappa on validation set is: %f' % kappa)
-        if not silent:
+        if print_confusion_mat:
             print_confusion_matrix(M)
         return [val_loss, kappa]
 
-    def train(self, max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch):
+    def train(self, max_epochs, decay_patience, decay_factor, decay_limit,
+              noise_decay_start, noise_decay_duration, noise_decay_severity,
+              validations_per_epoch, print_confusion_mat):
         print("Training...")
         start_time = time.clock()
         batch_multiple_to_validate = max(1, int(self.n_train_batches / float(validations_per_epoch)))
@@ -444,7 +446,7 @@ class VGGNet(object):
                     mins_per_epoch = self.n_train_batches*(time.clock() - start_time)/(self.iter*60.)
                     print('training @ iter = %i @ %.1fm (ETA %.1fm). Cur training error is %f %%' %
                         (self.iter, ((time.clock() - start_time )/60.), mins_per_epoch*(max_epochs-self.epoch), 100*batch_train_loss))
-                    self.validate()
+                    self.validate(print_confusion_mat=print_confusion_mat)
                     self.save_progress()
                     print('     averaging %f mins per epoch' % mins_per_epoch)
 
@@ -497,7 +499,8 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
                  valid_flip, test_flip, sample_class, custom_distribution,
                  train_color_cast, valid_color_cast, test_color_cast,
                  color_cast_range, override_input_size, model_file, filter_shape,
-                 cache_size_factor, cuda_convnet, pre_train_crop, train_crop, valid_test_crop, image_extension):
+                 cache_size_factor, cuda_convnet, pre_train_crop, train_crop, valid_test_crop,
+                 image_extension, print_confusion_mat):
     runid = "%s-%s-%s" % (str(uuid.uuid4())[:8], network, loss_type)
     print("[INFO] Starting runid %s" % runid)
     if custom_distribution and sample_class: # lame hardcode
@@ -517,7 +520,7 @@ def init_and_train(network, init_learning_rate, momentum, max_epochs, train_data
         column = VGGNet(data_stream, batch_size, init_learning_rate, momentum, leak_alpha, model_spec, loss_type, num_output_classes, pad, image_shape, filter_shape, cuda_convnet=cuda_convnet, runid=runid)
 
     try:
-        column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch)
+        column.train(max_epochs, decay_patience, decay_factor, decay_limit, noise_decay_start, noise_decay_duration, noise_decay_severity, validations_per_epoch, print_confusion_mat)
     except KeyboardInterrupt:
         print "[ERROR] User terminated Training, saving results"
     except UnsupportedPredictedClasses as e:
@@ -571,4 +574,5 @@ if __name__ == '__main__':
                 pre_train_crop=_.pre_train_crop,
                 train_crop=_.train_crop,
                 valid_test_crop=_.valid_test_crop,
-                image_extension=_.image_extension)
+                image_extension=_.image_extension,
+                print_confusion_mat=_.print_confusion_mat)

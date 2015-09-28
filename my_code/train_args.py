@@ -208,5 +208,11 @@ def get():
                         "--image-extension",
                         type=str,
                         default='.png')
+    parser.add_argument("-T",
+                        "--print-confusion-mat",
+                        type=int,
+                        default=1,
+                        choices=[0,1],
+                        help="Whether or not to print the confusion matrix (on the screen) every validation while training (which will be kxk where k is the number of output classes).")
 
     return parser.parse_args()
