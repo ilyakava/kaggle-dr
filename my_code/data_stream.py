@@ -181,7 +181,6 @@ class DataStream(object):
         self.K = bd.K
 
         valid_examples = bd.break_off_block(self.valid_dataset_size)
-        pdb.set_trace()
         self.train_examples = bd.remainder()
         self.n_train_batches = int(bd.size() / self.batch_size)
 
