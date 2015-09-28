@@ -194,7 +194,8 @@ def get():
                         "--pre-train-crop",
                         type=str,
                         default='center_crop',
-                        help="Name of method that returns integers ranges to crop an image by.")
+                        choices=['uniform_crop', 'center_crop'],
+                        help="Name of method that returns integers ranges to crop an image by. Pre-train means the crop used to generate images used for computing mean and std dev image.")
     parser.add_argument("-k2",
                         "--train-crop",
                         type=str,
@@ -203,5 +204,9 @@ def get():
                         "--valid-test-crop",
                         type=str,
                         default='center_crop')
+    parser.add_argument("-I",
+                        "--image-extension",
+                        type=str,
+                        default='.png')
 
     return parser.parse_args()

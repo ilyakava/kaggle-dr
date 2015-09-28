@@ -146,7 +146,8 @@ class DataStream(object):
                  color_cast_range=20,
                  pre_train_crop='center_crop',
                  train_crop='uniform_crop',
-                 valid_test_crop='center_crop'):
+                 valid_test_crop='center_crop',
+                 image_extension='.png'):
         self.train_image_dir = train_image_dir
         self.test_image_dir = test_image_dir
         self.image_shape = image_shape
@@ -174,6 +175,7 @@ class DataStream(object):
         self.pre_train_crop_lambda = crop_oracle.get_crop_lambda(pre_train_crop)
         self.train_crop_lambda = crop_oracle.get_crop_lambda(train_crop)
         self.valid_test_crop_lambda = crop_oracle.get_crop_lambda(valid_test_crop)
+        self.image_extension = image_extension
 
         bd = BlockDesigner(train_labels_csv_path, seed=self.random_seed)
         self.K = bd.K
@@ -245,7 +247,7 @@ class DataStream(object):
                                                         self.test_flip_lambda, self.test_color_cast_lambda)
             yield numpy.rollaxis(x_cache_block, 3, 1), numpy.array(idxs_to_full_dataset, dtype='int32')
 
-    def read_image(self, image_name, image_dir, crop_lambda, extension=".png"):
+    def read_image(self, image_name, image_dir, crop_lambda, extension):
         """
         :type image: string
         """
@@ -297,7 +299,7 @@ class DataStream(object):
         return image
 
     def feed_image(self, image_name, image_dir, crop_lambda=None, flip_lambda=None, color_cast_lambda=None):
-        img = self.read_image(image_name, image_dir, crop_lambda)
+        img = self.read_image(image_name, image_dir, crop_lambda, self.image_extension)
         flip_coords = flip_lambda(image_name) if flip_lambda else numpy.zeros(2)
         color_cast = color_cast_lambda() if color_cast_lambda else numpy.zeros(self.image_shape[-1])
         return self.preprocess_image(img, flip_coords, color_cast)
@@ -313,7 +315,7 @@ class DataStream(object):
         N = sum([len(ids) for y, ids in self.train_examples.items()]) # self.train_dataset_size + remainders
         for y, ids in self.train_examples.items():
             for image in ids:
-                img = self.read_image(image, self.train_image_dir, self.pre_train_crop_lambda)
+                img = self.read_image(image, self.train_image_dir, self.pre_train_crop_lambda, self.image_extension)
                 mean += img
                 mean_sqr += numpy.square(img)
         self.mean = mean / N
@@ -350,7 +352,7 @@ class DataStream(object):
 
     def setup_test_dataset(self):
         if self.test_image_dir:
-            images = numpy.array([path.splitext(f)[0] for f in listdir(self.test_image_dir) if re.search('\.(jpeg|png)', f)])
+            images = numpy.array([path.splitext(f)[0] for f in listdir(self.test_image_dir) if re.search('\.(jpeg|jpg|png)', f, flags=re.IGNORECASE)])
         else:
             images = []
         return {"X": natsort.natsorted(images)}
