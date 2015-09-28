@@ -60,14 +60,16 @@ class BlockDesigner(object):
             self.K = max(self.K,y+1) # we assume labelling starts at zero
 
     def fill_reservoir_with_csv(self, label_csv):
-        pdb.set_trace()
+        i = 0
         with open(label_csv, 'rb') as csvfile:
             reader = csv.reader(csvfile)
             next(reader, None)
             for row in reader:
+                i+=1
                 id = row[0]
                 y = int(row[1])
                 self.safe_insert(y,id)
+        pdb.set_trace()
 
 
 
