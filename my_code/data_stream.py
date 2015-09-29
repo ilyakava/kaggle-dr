@@ -178,13 +178,10 @@ class DataStream(object):
         self.image_extension = image_extension
 
         bd = BlockDesigner(train_labels_csv_path, seed=self.random_seed)
-        pdb.set_trace()
         self.K = bd.K
 
         valid_examples = bd.break_off_block(self.valid_dataset_size)
-        pdb.set_trace()
         self.train_examples = bd.remainder()
-        pdb.set_trace()
         self.n_train_batches = int(bd.size() / self.batch_size)
 
         self.valid_dataset = self.setup_valid_dataset(valid_examples)
