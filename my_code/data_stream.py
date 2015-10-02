@@ -195,6 +195,7 @@ class DataStream(object):
 
         if self.center == 1 or self.normalize == 1:
             self.calc_mean_std_image()
+        pdb.set_trace()
 
     def valid_set(self):
         all_val_images = numpy.zeros(((len(self.valid_dataset["y"]),) + self.image_shape), dtype=theano.config.floatX)
