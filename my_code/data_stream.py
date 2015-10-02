@@ -196,11 +196,11 @@ class DataStream(object):
         if self.center == 1 or self.normalize == 1:
             self.calc_mean_std_image()
 
-        pdb.set_trace()
         with open('valid.txt', 'w') as f:
-            for i in range(len(self.train_dataset["X"])):
-                line = "%s.jpg %i\n" % (self.train_dataset["X"][i], self.train_dataset["y"][i])
+            for i in range(len(self.valid_dataset["X"])):
+                line = "%s.jpg %i\n" % (self.valid_dataset["X"][i], self.valid_dataset["y"][i])
                 f.write(line)
+        pdb.set_trace()
 
     def valid_set(self):
         all_val_images = numpy.zeros(((len(self.valid_dataset["y"]),) + self.image_shape), dtype=theano.config.floatX)
