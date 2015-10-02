@@ -198,7 +198,7 @@ class DataStream(object):
 
         with open('train.txt', 'w') as f:
             for i in range(len(self.train_dataset["X"])):
-                line = "%s.png %i\n" % (self.train_dataset["X"][i], self.train_dataset["y"][i])
+                line = "%s.jpg %i\n" % (self.train_dataset["X"][i], self.train_dataset["y"][i])
                 f.write(line)
         pdb.set_trace()
 
