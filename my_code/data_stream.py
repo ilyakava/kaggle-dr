@@ -195,6 +195,11 @@ class DataStream(object):
 
         if self.center == 1 or self.normalize == 1:
             self.calc_mean_std_image()
+
+        with open('train.txt', 'w') as f:
+            for i in range(len(self.train_dataset["X"])):
+                line = "%s.png %i\n" % (self.train_dataset["X"][i], self.train_dataset["y"][i])
+                f.write(line)
         pdb.set_trace()
 
     def valid_set(self):
