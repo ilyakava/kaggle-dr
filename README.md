@@ -52,7 +52,8 @@ While I competed in the challenge, this project evolved into my personal general
 
 `sudo pip install theano scikit-learn scikit-image nyanbar natsort`
 
-If `skimage.io` has issues, try: `sudo pip install -U scikit-image`.
+- If `skimage.io` has issues, try: `sudo pip install -U scikit-image`.
+- I used theano version '0.7.0'
 
 ### Install Lasagne
 
